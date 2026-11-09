@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="IconMaker: draw simple SVG icons in your browser. Click to add points, drag to bend curves, add shapes and colours, then save an SVG or PNG. Nothing to install." />
+<meta name="theme-color" content="#0b0c10" />
+<title>IconMaker: draw simple SVG icons</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header id="topbar" class="glass-card">
+  <span class="brand">IconMaker</span>
+  <div class="tb-sep"></div>
+  <div class="tb-group" id="size-group" role="group" aria-label="Icon size">
+    <button class="chip" data-size="16" data-tip="16 × 16 pixels (key 1)">16</button>
+    <button class="chip sel" data-size="32" data-tip="32 × 32 pixels (key 2)">32</button>
+    <button class="chip" data-size="64" data-tip="64 × 64 pixels (key 3)">64</button>
+    <button class="chip" data-size="128" data-tip="128 × 128 pixels (key 4)">128</button>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <button id="undo" class="icon-btn" aria-label="Undo" data-tip="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5" /><path d="M4 9h10a5 5 0 0 1 0 10H9" /></svg></button>
+    <button id="redo" class="icon-btn" aria-label="Redo" data-tip="Redo (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5" /><path d="M20 9H10a5 5 0 0 0 0 10h6" /></svg></button>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-group">
+    <button id="new" class="icon-btn" aria-label="New icon" data-tip="New icon"><svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" /><path d="M12 11v6M9 14h6" /></svg></button>
+    <button id="open" class="icon-btn" aria-label="Open a saved icon" data-tip="Open a saved icon (Ctrl+O)"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v1H3z" /><path d="M3 10h18v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg></button>
+    <button id="save" class="icon-btn" aria-label="Save icon file" data-tip="Save icon file (Ctrl+S)"><svg viewBox="0 0 24 24"><path d="M5 3h11l5 5v13H5z" /><path d="M8 3v6h8" /><rect x="8" y="13" width="8" height="6" /></svg></button>
+  </div>
+  <div class="tb-grow"></div>
+  <div class="tb-group">
+    <button id="export-svg" class="icon-btn" aria-label="Download SVG" data-tip="Download as SVG"><svg viewBox="0 0 24 24"><path d="M4 16v4h16v-4" /><path d="M12 4v11M7 10l5 5 5-5" /></svg></button>
+    <button id="export-png" class="icon-btn" aria-label="Download PNG" data-tip="Download as PNG (transparent)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M6 17l4-6 3 4 3-3 2 5" /><circle cx="9" cy="8" r="1.6" /></svg></button>
+    <button id="export-all" class="icon-btn" aria-label="Download PNGs in all sizes" data-tip="Download PNGs in all sizes"><svg viewBox="0 0 24 24"><rect x="3" y="12" width="6" height="8" rx="1" /><rect x="11" y="8" width="8" height="12" rx="1" /><rect x="17" y="3" width="4" height="17" rx="1" opacity=".6" /></svg></button>
+  </div>
+  <div class="tb-sep"></div>
+  <button id="help-btn" class="icon-btn" aria-label="Keyboard shortcuts and help" data-tip="Help and shortcuts (?)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14" /><path d="M12 17.5h.01" /></svg></button>
+</header>
+
+<nav id="tools" class="glass-card" aria-label="Tools">
+  <button class="tool sel" data-tool="select" aria-label="Select and move" aria-pressed="true" data-tip="Select and move (V)"><svg viewBox="0 0 24 24"><path d="M6 3l12 9-6 1-2 6z" /></svg></button>
+  <button class="tool" data-tool="pen" aria-label="Pen: points and curves" aria-pressed="false" data-tip="Pen: points and curves (P). Drag a point to bend it"><svg viewBox="0 0 24 24"><path d="M15.707 21.293a1 1 0 0 1-1.414 0l-1.586-1.586a1 1 0 0 1 0-1.414l5.586-5.586a1 1 0 0 1 1.414 0l1.586 1.586a1 1 0 0 1 0 1.414z" /><path d="m18 13-1.375-6.874a1 1 0 0 0-.746-.776L3.235 2.028a1 1 0 0 0-1.207 1.207L5.35 15.879a1 1 0 0 0 .776.746L13 18" /><path d="m2.3 2.3 7.286 7.286" /><circle cx="11" cy="11" r="2" /></svg></button>
+  <button class="tool" data-tool="pencil" aria-label="Pencil: freehand" aria-pressed="false" data-tip="Pencil: draw freely (B)"><svg viewBox="0 0 24 24"><path d="M3 21l4-1 13-13-3-3L4 17z" /><path d="M14 6l3 3" /></svg></button>
+  <button class="tool" data-tool="line" aria-label="Line" aria-pressed="false" data-tip="Line (L). Shift snaps the angle"><svg viewBox="0 0 24 24"><path d="M4 20L20 4" /></svg></button>
+  <button class="tool" data-tool="rect" aria-label="Rectangle" aria-pressed="false" data-tip="Rectangle (R). Shift = square, Alt = rounded"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /></svg></button>
+  <button class="tool" data-tool="ellipse" aria-label="Oval" aria-pressed="false" data-tip="Oval (E). Shift = circle"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /></svg></button>
+  <button class="tool" data-tool="fill" aria-label="Fill colour" aria-pressed="false" data-tip="Fill (G): click inside a shape"><svg viewBox="0 0 24 24"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z" /><path d="m5 2 5 5" /><path d="M2 13h15" /><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z" /></svg></button>
+  <button class="tool" data-tool="stroke" aria-label="Outline style" aria-pressed="false" data-tip="Outline (K): click a shape's edge"><svg viewBox="0 0 24 24"><path d="M3 17c6-2 12-2 18 0" stroke-width="3.5" /></svg></button>
+  <button class="tool" data-tool="node" aria-label="Edit points" aria-pressed="false" data-tip="Edit points and curves (T)"><svg viewBox="0 0 24 24"><path d="M4 16c6-12 14 8 16-8" /><rect x="3" y="15" width="3" height="3" /><rect x="20" y="7" width="3" height="3" /></svg></button>
+  <button class="tool" data-tool="eraser" aria-label="Eraser" aria-pressed="false" data-tip="Eraser (C): click or drag over shapes"><svg viewBox="0 0 24 24"><path d="M4 15L15 4l5 5-11 11z" /><path d="M2 21h20" /></svg></button>
+  <button class="tool" data-tool="eyedropper" aria-label="Pick a colour" aria-pressed="false" data-tip="Pick a colour (I)"><svg viewBox="0 0 24 24"><path d="m2 22 1-1h3l9-9" /><path d="M3 21v-3l9-9" /><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" /></svg></button>
+  <button class="tool" data-tool="hand" aria-label="Move the view" aria-pressed="false" data-tip="Move the view (H, or hold Space)"><svg viewBox="0 0 24 24"><path d="M8 11V5a2 2 0 0 1 4 0v6M12 10V4a2 2 0 0 1 4 0v8M16 11v-2a2 2 0 0 1 4 0v7a6 6 0 0 1-6 6h-2a6 6 0 0 1-5-3l-3-5c-1-2 1-3 2-2l3 3" /></svg></button>
+</nav>
+
+<main id="canvas-wrap">
+  <svg id="canvas" class="tool-select" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Drawing area"></svg>
+
+  <div id="hint" class="hint hidden" role="status" aria-live="polite">
+    <span id="hint-text"></span>
+    <button id="hint-close" class="hint-close" type="button" aria-label="Hide tips" data-tip="Hide tips (turn them back on in Help)"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+  </div>
+
+  <div id="zoombar" class="glass-card">
+    <button id="snap-toggle" class="icon-btn on" aria-pressed="true" aria-label="Snap to points, lines and pixels" data-tip="Snapping (S)"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4" /><rect x="9" y="9" width="6" height="6" rx="1.5" /></svg></button>
+    <button id="grid-toggle" class="icon-btn on" aria-pressed="true" aria-label="Show pixel grid" data-tip="Pixel grid (`)"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z M10 4v16M14 4v16M4 10h16M4 14h16" /></svg></button>
+    <span class="zb-sep"></span>
+    <button id="zoom-out" class="icon-btn" aria-label="Zoom out" data-tip="Zoom out (-)"><svg viewBox="0 0 24 24"><path d="M5 12h14" /></svg></button>
+    <span id="zoom-label" class="zoom-label">800%</span>
+    <button id="zoom-in" class="icon-btn" aria-label="Zoom in" data-tip="Zoom in (+)"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button>
+    <button id="zoom-fit" class="icon-btn" aria-label="Fit to screen" data-tip="Fit to screen (0)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
+  </div>
+
+  <section id="preview-card" class="glass-card" aria-label="How the icon looks at real sizes">
+    <div class="preview-head"><span class="preview-title">Real size (1:1)</span></div>
+    <div id="preview-mini"></div>
+  </section>
+</main>
+
+<aside id="panel" class="glass-card">
+  <div class="panel-tabs" role="tablist">
+    <button id="tab-layers" class="tab" role="tab" aria-selected="false" aria-controls="panel-layers" aria-label="Layers" data-tip="Layers"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z" /><path d="M3 13l9 5 9-5" /></svg></button>
+    <button id="tab-style" class="tab sel" role="tab" aria-selected="true" aria-controls="panel-style" aria-label="Colours and lines" data-tip="Colours and lines"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" opacity=".5" /></svg></button>
+  </div>
+
+  <div id="panel-layers" class="panel-body hidden" role="tabpanel">
+    <div id="layer-list"></div>
+    <div class="layer-actions">
+      <button id="layer-add" class="icon-btn" aria-label="Add a layer" data-tip="Add a layer"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button>
+      <button id="layer-dup" class="icon-btn" aria-label="Duplicate layer" data-tip="Duplicate this layer"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V4h12" /></svg></button>
+      <button id="layer-del" class="icon-btn" aria-label="Delete layer" data-tip="Delete this layer"><svg viewBox="0 0 24 24"><path d="M5 6h14M8 6V4h8v2M6 6l1 15h10l1-15" /></svg></button>
+    </div>
+    <p class="panel-note">Double-click a name to rename it. Drag layers to change their order.</p>
+  </div>
+
+  <div id="panel-style" class="panel-body" role="tabpanel">
+    <div class="shape-row" role="group" aria-label="Shapes">
+      <button id="shape-group" class="shape-btn" disabled aria-label="Group" data-tip="Group the selected shapes (Ctrl+G)"><svg viewBox="0 0 24 24"><rect class="frame" x="2.5" y="2.5" width="19" height="19" rx="2" /><rect x="6" y="6" width="6" height="6" /><rect x="12" y="12" width="6" height="6" /></svg></button>
+      <button id="shape-ungroup" class="shape-btn" disabled aria-label="Ungroup" data-tip="Ungroup (Ctrl+Shift+G)"><svg viewBox="0 0 24 24"><path class="frame" d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3" /><rect x="6" y="6" width="5" height="5" /><rect x="13" y="13" width="5" height="5" /></svg></button>
+      <span class="shape-sep" aria-hidden="true"></span>
+      <button id="shape-union" class="shape-btn" disabled aria-label="Union" data-tip="Union: join the selected shapes into one (uses the back-most shape's style)"><svg viewBox="0 0 24 24"><path class="f" d="M3 3h11v7h7v11H10v-7H3z" /></svg></button>
+      <button id="shape-subtract" class="shape-btn" disabled aria-label="Subtract" data-tip="Subtract: cut the front shapes out of the back-most shape"><svg viewBox="0 0 24 24"><path class="f" d="M3 3h11v7h-4v4H3z" /><rect class="ghost" x="10" y="10" width="11" height="11" /></svg></button>
+      <button id="shape-intersect" class="shape-btn" disabled aria-label="Intersect" data-tip="Intersect: keep only the area shared by all selected shapes"><svg viewBox="0 0 24 24"><rect class="ghost" x="3" y="3" width="11" height="11" /><rect class="ghost" x="10" y="10" width="11" height="11" /><rect class="f" x="10" y="10" width="4" height="4" /></svg></button>
+      <button id="shape-exclude" class="shape-btn" disabled aria-label="Exclude overlap" data-tip="Exclude: keep the area covered by exactly one shape (removes the overlap)"><svg viewBox="0 0 24 24"><path class="f" d="M3 3h11v7h-4v4H3z" /><path class="f" d="M21 21H10v-7h4v-4h7z" /></svg></button>
+    </div>
+    <section class="style-sec" data-target="fill" aria-labelledby="sec-area-title">
+      <h3 id="sec-area-title" class="sec-title">Area</h3>
+      <input type="color" id="fill-color" class="colour" value="#5b8def" aria-label="Area colour" data-tip="Area colour" />
+      <div id="fill-rows">
+        <div class="seg-row" role="group" aria-label="Fill type">
+          <button class="seg" data-fill-kind="color" aria-pressed="true">Solid</button>
+          <button class="seg" data-fill-kind="gradient" aria-pressed="false">Gradient</button>
+          <button class="seg" data-fill-kind="none" aria-pressed="false">None</button>
+        </div>
+        <div id="grad-bar" class="hidden" aria-label="Gradient colours. Drag the dots; the selected dot is the colour you change"></div>
+        <div class="slider-row"><span>Opacity</span><input type="range" id="fill-opacity" aria-label="Area opacity" min="0" max="1" step="0.05" value="1" /><span class="num-wrap"><input type="number" class="num" id="fill-opacity-n" aria-label="Area opacity in percent" min="0" max="100" step="1" value="100" /><em>%</em></span></div>
+      </div>
+    </section>
+
+    <section class="style-sec" data-target="stroke" aria-labelledby="sec-border-title">
+      <h3 id="sec-border-title" class="sec-title">Border</h3>
+      <input type="color" id="stroke-color" class="colour" value="#1d1d1f" aria-label="Border colour" data-tip="Border colour" />
+      <div id="stroke-rows">
+        <div class="slider-row"><span>Thickness</span><input type="range" id="stroke-width" aria-label="Border thickness" min="0" max="12" step="0.25" value="2" /><span class="num-wrap"><input type="number" class="num" id="stroke-width-n" aria-label="Border thickness in pixels" min="0" max="64" step="0.25" value="2" /><em>px</em></span></div>
+        <div class="slider-row"><span>Opacity</span><input type="range" id="stroke-opacity" aria-label="Border opacity" min="0" max="1" step="0.05" value="1" /><span class="num-wrap"><input type="number" class="num" id="stroke-opacity-n" aria-label="Border opacity in percent" min="0" max="100" step="1" value="100" /><em>%</em></span></div>
+        <div class="dash-row" role="group" aria-label="Line style">
+          <button class="dash sel" data-dash="none" aria-pressed="true" aria-label="Solid line" data-tip="Solid"><svg viewBox="0 0 24 24"><path d="M2 12h20" /></svg></button>
+          <button class="dash" data-dash="dash" aria-pressed="false" aria-label="Dashed line" data-tip="Dashed"><svg viewBox="0 0 24 24"><path d="M2 12h4M10 12h4M18 12h4" /></svg></button>
+          <button class="dash" data-dash="dot" aria-pressed="false" aria-label="Dotted line" data-tip="Dotted"><svg viewBox="0 0 24 24"><circle cx="4" cy="12" r="1.5" /><circle cx="10" cy="12" r="1.5" /><circle cx="16" cy="12" r="1.5" /><circle cx="22" cy="12" r="1.5" /></svg></button>
+          <button class="dash" data-dash="dashdot" aria-pressed="false" aria-label="Dash and dot line" data-tip="Dash and dot"><svg viewBox="0 0 24 24"><path d="M2 12h4M10 12h2M16 12h6" /><circle cx="8" cy="12" r="1.2" /></svg></button>
+        </div>
+      </div>
+    </section>
+
+    <div class="z-row" role="group" aria-label="Order">
+      <button id="z-front" class="icon-btn" aria-label="Bring to front" data-tip="Bring to front ( Shift+] )"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="11" height="11" opacity=".5" /><rect x="10" y="10" width="11" height="11" /></svg></button>
+      <button id="z-fwd" class="icon-btn" aria-label="Bring forward" data-tip="Bring forward (])"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="10" height="10" opacity=".4" /><rect x="10" y="10" width="10" height="10" /></svg></button>
+      <button id="z-bwd" class="icon-btn" aria-label="Send backward" data-tip="Send backward ([)"><svg viewBox="0 0 24 24"><rect x="10" y="10" width="10" height="10" opacity=".4" /><rect x="4" y="4" width="10" height="10" /></svg></button>
+      <button id="z-back" class="icon-btn" aria-label="Send to back" data-tip="Send to back ( Shift+[ )"><svg viewBox="0 0 24 24"><rect x="10" y="10" width="11" height="11" opacity=".5" /><rect x="3" y="3" width="11" height="11" /></svg></button>
+    </div>
+  </div>
+</aside>
+
+<input type="file" id="open-file" accept=".json,.iconmaker.json,application/json" hidden />
+<div id="toast" role="status" aria-live="polite"></div>
+
+<dialog id="help" aria-labelledby="help-title">
+  <div class="help-inner">
+    <h2 id="help-title">Help and shortcuts</h2>
+    <h3>How each tool works</h3>
+    <dl class="help-tools">
+      <dt>Select (V)</dt><dd>Click a shape to select it. Drag on empty space to select several; Shift adds to the selection. Drag to move, drag a corner to resize, drag the top circle to rotate.</dd>
+      <dt>Pen (P)</dt><dd>Click to place points. Press and drag a point to bend the line into a curve. Click the first point to close the shape; Enter or double-click finishes, Esc cancels. Click the end of an open line to keep drawing from it.</dd>
+      <dt>Pencil (B)</dt><dd>Draw freely. Let go to finish; the line is tidied up automatically.</dd>
+      <dt>Line (L)</dt><dd>Drag to draw a straight line. Hold Shift to snap the angle.</dd>
+      <dt>Rectangle (R), Oval (E)</dt><dd>Drag to draw. Hold Shift for a square or circle, Alt for rounded corners on a rectangle.</dd>
+      <dt>Fill (G)</dt><dd>Click inside a shape to fill it with the current colour. Drag across several shapes to fill them all.</dd>
+      <dt>Outline (K)</dt><dd>Click a shape's edge to give it the current line style. Drag across several edges to change them all.</dd>
+      <dt>Edit points (T)</dt><dd>Drag a point or its round handles. Click a small diamond to add a point; double-click a point to delete it. F makes a point smooth or sharp; G opens or closes the line.</dd>
+      <dt>Eraser (C)</dt><dd>Click a shape to remove it, or drag across shapes to remove several.</dd>
+      <dt>Pick a colour (I)</dt><dd>Click a shape to copy its colour into the Area or Border colour box.</dd>
+      <dt>Move the view (H)</dt><dd>Drag to move around the artboard. In any tool you can hold Space instead.</dd>
+    </dl>
+    <h3>Keyboard shortcuts</h3>
+    <div class="help-cols">
+      <dl>
+        <dt>V P B L R E G K T</dt><dd>Select, pen, pencil, line, rectangle, oval, fill, outline, edit points</dd>
+        <dt>C I H</dt><dd>Eraser, colour picker, move the view (or hold Space)</dd>
+        <dt>Ctrl+G / Ctrl+Shift+G</dt><dd>Group or ungroup the selected shapes. Grouped shapes move and resize together</dd>
+        <dt>Shapes row</dt><dd>Union joins shapes, Subtract cuts the front shapes out of the back one, Intersect keeps the shared area, Exclude keeps what is not shared</dd>
+        <dt>Ctrl+Z / Ctrl+Shift+Z</dt><dd>Undo and redo</dd>
+        <dt>Ctrl+C / V / D</dt><dd>Copy, paste, duplicate</dd>
+        <dt>Ctrl+A</dt><dd>Select everything on this layer</dd>
+        <dt>Delete</dt><dd>Remove the selection</dd>
+        <dt>Arrow keys</dt><dd>Nudge the selection by 1 px (Shift = 5 px)</dd>
+        <dt>Alt + drag</dt><dd>Copy while moving (select tool)</dd>
+      </dl>
+      <dl>
+        <dt>Shift</dt><dd>Straight line, square, circle; add to selection</dd>
+        <dt>Enter / double-click</dt><dd>Finish a pen line</dd>
+        <dt>Esc</dt><dd>Cancel a pen line, or clear the selection</dd>
+        <dt>F / G / Delete</dt><dd>Smooth or sharp point, open or close a shape, remove a point (edit points)</dd>
+        <dt>Hover a curve</dt><dd>A diamond shows where a point can be added; click it (edit points)</dd>
+        <dt>Snap (S)</dt><dd>Points and handles snap to the grid and to other points when on</dd>
+        <dt>Alt+click a point</dt><dd>Remove that point (edit points)</dd>
+        <dt>Drag a handle</dt><dd>Bend the curve; hold Alt to mirror the other handle of that point</dd>
+        <dt>[ ] &nbsp;Shift+[ ]</dt><dd>Move a shape backward or forward; send to back or front</dd>
+        <dt>{ }</dt><dd>Move a shape to the layer below or above</dd>
+        <dt>1 2 3 4</dt><dd>Icon size 16, 32, 64, 128</dd>
+        <dt>0 + - S `</dt><dd>Fit to screen, zoom, snapping, pixel grid</dd>
+        <dt>Ctrl+S / Ctrl+O</dt><dd>Save or open an icon file</dd>
+      </dl>
+    </div>
+    <p class="help-tip">Your drawing is saved in this browser automatically. Keep a copy with the save button if you want to bring it back later.</p>
+    <label class="help-switch"><input type="checkbox" id="help-hints" checked /> Show a short tip at the top of the drawing area</label>
+    <button id="help-close" class="primary-btn" type="button">Got it</button>
+  </div>
+</dialog>
+
+<script src="model.js"></script>
+<script src="renderer.js"></script>
+<script src="snapping.js"></script>
+<script src="overlay.js"></script>
+<script src="export.js"></script>
+<script src="io.js"></script>
+<script src="vendor/polybool.min.js"></script>
+<script src="merge.js"></script>
+<script src="tools.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
