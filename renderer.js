@@ -460,15 +460,24 @@ var IM = (window.IM = window.IM || {});
 
   // The icon's artboard: white with a transparency checkerboard, so colours
   // and see-through areas are both visible.
-  function buildArtboard(artG, doc, zoom) {
+  // bg: "checker" (default), "light" or "dark", to test the icon on both.
+  function buildArtboard(artG, doc, zoom, bg) {
     clear(artG);
     var size = doc.size;
+    if (bg === "light" || bg === "dark") {
+      artG.appendChild(el("rect", { x: 0, y: 0, width: size, height: size, fill: bg === "light" ? "#ffffff" : "#1a1a1a" }));
+      artG.appendChild(el("rect", {
+        x: 0, y: 0, width: size, height: size, fill: "none",
+        stroke: "rgba(127,127,127,0.55)", "stroke-width": 1 / zoom
+      }));
+      return;
+    }
     var cell = zoom >= 6 ? 1 : zoom >= 3 ? 2 : 4;
     var defs = el("defs", {});
     var pat = el("pattern", { id: "im-checker", width: cell * 2, height: cell * 2, patternUnits: "userSpaceOnUse" });
     pat.appendChild(el("rect", { x: 0, y: 0, width: cell * 2, height: cell * 2, fill: "#ffffff" }));
-    pat.appendChild(el("rect", { x: 0, y: 0, width: cell, height: cell, fill: "#e3e4e8" }));
-    pat.appendChild(el("rect", { x: cell, y: cell, width: cell, height: cell, fill: "#e3e4e8" }));
+    pat.appendChild(el("rect", { x: 0, y: 0, width: cell, height: cell, fill: "#e3e3e3" }));
+    pat.appendChild(el("rect", { x: cell, y: cell, width: cell, height: cell, fill: "#e3e3e3" }));
     defs.appendChild(pat);
     artG.appendChild(defs);
     artG.appendChild(el("rect", { x: 0, y: 0, width: size, height: size, fill: "url(#im-checker)" }));
@@ -496,7 +505,7 @@ var IM = (window.IM = window.IM || {});
 
   // ctx = { worldG, artG, defsG, gridG, layersG }. worldG carries the view
   // transform. The overlay group is owned by overlay.js and left alone.
-  R.renderDoc = function (ctx, doc, view) {
+  R.renderDoc = function (ctx, doc, view, opts) {
     var zoom = view && view.zoom > 0 ? view.zoom : 1;
     var panX = view && view.panX ? view.panX : 0;
     var panY = view && view.panY ? view.panY : 0;
@@ -504,7 +513,7 @@ var IM = (window.IM = window.IM || {});
       ctx.worldG.setAttribute("transform", "translate(" + num(panX) + "," + num(panY) + ") scale(" + num(zoom) + ")");
     }
     if (ctx.defsG) R.buildDefs(ctx.defsG, doc, "");
-    if (ctx.artG) buildArtboard(ctx.artG, doc, zoom);
+    if (ctx.artG) buildArtboard(ctx.artG, doc, zoom, opts && opts.bg);
     if (ctx.gridG) buildGrid(ctx.gridG, doc, zoom);
     if (ctx.layersG) {
       clear(ctx.layersG);

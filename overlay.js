@@ -114,10 +114,54 @@ var IM = (window.IM = window.IM || {});
     }
   }
 
+  // A small label with a coloured background, kept at a fixed size on screen.
+  function badge(g, x, y, text, zoom, cls) {
+    var fs = 11 / zoom, padX = 5 / zoom, h = 17 / zoom;
+    var w = text.length * 6.7 / zoom + padX * 2;
+    g.appendChild(el("rect", { x: x - w / 2, y: y, width: w, height: h, rx: 4 / zoom, "class": cls || "ov-badge" }));
+    var t = el("text", { x: x, y: y + h / 2, "font-size": fs, "text-anchor": "middle", "dominant-baseline": "central", "class": "ov-badge-t" });
+    t.textContent = text;
+    g.appendChild(t);
+  }
+
+  function fmtNum(v) { return String(Math.round(v * 10) / 10); }
+
+  // Hover outline: shows which shape a click would pick (select tool only).
+  function drawHover(g, app, zoom) {
+    var st = app.state;
+    if (st.tool !== "select" || !st.hoverId || st.pointerDown || st.selPathIds.indexOf(st.hoverId) >= 0) return;
+    var lid = IM.Model.findPathLayer(app.doc, st.hoverId);
+    var p = lid && IM.Model.pathIn(app.doc, lid, st.hoverId);
+    if (!p) return;
+    g.appendChild(el("path", { d: IM.Renderer.pathD(p), "class": "ov-hover", "stroke-width": 1.5 / zoom, fill: "none" }));
+  }
+
+  // Size badge under the selection, and distances to the artboard edges while dragging.
+  function drawMeasures(g, app, bb, zoom) {
+    var size = app.doc.size, st = app.state;
+    badge(g, bb.x + bb.w / 2, bb.y + bb.h + 8 / zoom, fmtNum(bb.w) + " × " + fmtNum(bb.h), zoom);
+    if (!st.pointerDown) return;
+    var cx = bb.x + bb.w / 2, cy = bb.y + bb.h / 2, sw = 1 / zoom, off = 9 / zoom;
+    var gaps = [
+      { d: bb.x, x1: 0, y1: cy, x2: bb.x, y2: cy, lx: bb.x / 2, ly: cy - off * 2 },
+      { d: size - bb.x - bb.w, x1: bb.x + bb.w, y1: cy, x2: size, y2: cy, lx: (bb.x + bb.w + size) / 2, ly: cy - off * 2 },
+      { d: bb.y, x1: cx, y1: 0, x2: cx, y2: bb.y, lx: cx, ly: bb.y / 2 - off },
+      { d: size - bb.y - bb.h, x1: cx, y1: bb.y + bb.h, x2: cx, y2: size, lx: cx, ly: (bb.y + bb.h + size) / 2 - off }
+    ];
+    for (var i = 0; i < gaps.length; i++) {
+      var q = gaps[i];
+      if (!(q.d > 0.05)) continue;
+      g.appendChild(el("line", { x1: q.x1, y1: q.y1, x2: q.x2, y2: q.y2, "class": "ov-measure", "stroke-width": sw, "stroke-dasharray": dashArray(zoom) }));
+      badge(g, q.lx, q.ly, fmtNum(q.d), zoom, "ov-badge-m");
+    }
+  }
+
   function render(app) {
     clear(app);
     var g = app.canvas.overlayG, zoom = app.view.zoom, st = app.state, tool = st.tool;
     var hs = HANDLE_PX / zoom;
+
+    drawHover(g, app, zoom);
 
     // selection outlines for every tool except the node tool (which draws its own)
     if (tool !== "node" && st.selPathIds.length) {
@@ -140,6 +184,7 @@ var IM = (window.IM = window.IM || {});
           x1: bb.x + bb.w / 2, y1: bb.y, x2: bb.x + bb.w / 2, y2: bb.y - ROTATE_PX / zoom,
           "class": "ov-handle", "stroke-width": 1 / zoom
         }));
+        drawMeasures(g, app, bb, zoom);
         var hl = boxHandles(bb, zoom);
         for (var h = 0; h < hl.length; h++) {
           if (hl[h].kind === "bbox-rotate") {

@@ -69,9 +69,10 @@ var IM = (window.IM = window.IM || {});
     }, 1000);
   }
 
-  function downloadSVG(doc, size) {
+  // `name` is the file name without size or extension ("icon" by default).
+  function downloadSVG(doc, size, name) {
     var text = svgString(doc, size || doc.size);
-    download(new Blob([text], { type: "image/svg+xml" }), "icon-" + (size || doc.size) + ".svg");
+    download(new Blob([text], { type: "image/svg+xml" }), (name || "icon") + "-" + (size || doc.size) + ".svg");
   }
 
   // Rasterises the SVG at size*scale px. cb(blob) — blob is null on failure.
@@ -96,28 +97,40 @@ var IM = (window.IM = window.IM || {});
     img.src = url;
   }
 
-  function downloadPNG(doc, size, cb) {
+  function downloadPNG(doc, size, cb, name) {
     pngBlob(doc, size, 1, function (b) {
-      if (b) download(b, "icon-" + size + ".png");
+      if (b) download(b, (name || "icon") + "-" + size + ".png");
       if (cb) cb(!!b);
     });
   }
 
-  // One PNG per standard size, spaced out so browsers allow every download.
-  function exportAll(doc, cb) {
+  // Downloads `format` ("svg" | "png") at each size in `sizes`, spaced out so
+  // browsers allow every download. cb(okCount).
+  function exportMany(doc, format, sizes, name, cb) {
     var i = 0, okCount = 0;
     function next() {
-      if (i >= SIZES.length) {
+      if (i >= sizes.length) {
         if (cb) cb(okCount);
         return;
       }
-      var size = SIZES[i++];
+      var size = sizes[i++];
+      if (format === "svg") {
+        downloadSVG(doc, size, name);
+        okCount += 1;
+        setTimeout(next, 300);
+        return;
+      }
       downloadPNG(doc, size, function (ok) {
         if (ok) okCount += 1;
         setTimeout(next, 400);
-      });
+      }, name);
     }
     next();
+  }
+
+  // One PNG per standard size.
+  function exportAll(doc, cb) {
+    exportMany(doc, "png", SIZES, "icon", cb);
   }
 
   IM.Export = {
@@ -127,6 +140,7 @@ var IM = (window.IM = window.IM || {});
     pngBlob: pngBlob,
     downloadPNG: downloadPNG,
     exportAll: exportAll,
+    exportMany: exportMany,
     sizes: SIZES
   };
 })();

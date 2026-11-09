@@ -13,8 +13,11 @@
   var DEFAULT_SIZE = 32;
   var MAX_ZOOM = 48;
   var ZOOM_STEPS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48];
-  var EYE_SVG = '<svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
-  var LOCK_SVG = '<svg viewBox="0 0 24 24"><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M5 10h14v11H5z"/></svg>';
+  var EYE_SVG = '<svg viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></svg>';
+  var EYE_OFF_SVG = '<svg viewBox="0 0 24 24"><path d="M10.73 5.08a10.74 10.74 0 0 1 11.2 6.57 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-1.44 2.49"/><path d="M14.08 14.16a3 3 0 0 1-4.24-4.24"/><path d="M17.48 17.5a10.75 10.75 0 0 1-15.42-5.15 1 1 0 0 1 0-.7 10.75 10.75 0 0 1 4.45-5.14"/><path d="m2 2 20 20"/></svg>';
+  var LOCK_SVG = '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  var LOCK_OPEN_SVG = '<svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.75-1.4"/></svg>';
+  var REDUCED_MOTION = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
   /* ---------- small DOM helpers ---------- */
 
@@ -60,8 +63,15 @@
       penDraft: null,
       ghost: null,
       penPreviewSeg: null,
-      marquee: null
+      marquee: null,
+      artboardBg: "checker",        // "checker" | "light" | "dark"
+      pixelPreview: false,
+      hoverId: null,
+      pointerDown: false
     },
+    renderHooks: [],                // called after every render (ui.js)
+    panelHooks: [],                 // called after the panels are rebuilt (ui.js)
+    booted: false,
     canvas: null,
     layersPanel: null,
     miniSvgs: [],
@@ -168,6 +178,7 @@
   function pushHistory(label, op, opts) {
     opts = opts || {};
     normalizeOp(op);
+    if (label && !op.label) op.label = label;
     if (!opts.applied) M.applyOp(app.doc, op, true);
     if (app.tx) app.tx.ops.push(op);
     else app.history.push(op, opts.key);
@@ -177,15 +188,15 @@
   }
 
   // Everything pushed between beginTx and endTx undoes as one step.
-  function beginTx() {
-    if (!app.tx) app.tx = { ops: [] };
+  function beginTx(label) {
+    if (!app.tx) app.tx = { ops: [], label: label || null };
   }
 
   function endTx() {
     var tx = app.tx;
     app.tx = null;
     if (!tx || tx.ops.length === 0) return;
-    app.history.push(tx.ops.length === 1 ? tx.ops[0] : { type: "batch", ops: tx.ops });
+    app.history.push(tx.ops.length === 1 ? tx.ops[0] : { type: "batch", ops: tx.ops, label: tx.label || tx.ops[0].label });
     markDirty();
     syncHistoryButtons();
   }
@@ -204,6 +215,17 @@
       app.toast("Nothing to undo");
       return;
     }
+    afterHistoryChange();
+  }
+
+  // Goes back or forward to just after step `index` (-1 = before every step).
+  function historyJump(index) {
+    endTx();
+    var h = app.history;
+    index = clamp(index, -1, h.stack.length - 1);
+    if (index === h.ptr) return;
+    while (h.ptr > index && h.undo()) { /* step back */ }
+    while (h.ptr < index && h.redo()) { /* step forward */ }
     afterHistoryChange();
   }
 
@@ -236,7 +258,7 @@
 
   // Fits the artboard to about 80% of the canvas, centred. It shrinks only if the zoom bar or
   // preview card would cover it, and then centres it in the free strip beside or above the card.
-  function fit() {
+  function fit(animate) {
     var r = canvasRect(), size = app.doc.size, gap = 16;
     function box(sel) {
       var b = qs(sel).getBoundingClientRect();
@@ -254,14 +276,23 @@
       });
     }
     function place(z, x, y) {
-      app.view.zoom = z;
-      app.view.panX = x;
-      app.view.panY = y;
       app.fitView = { zoom: z, panX: x, panY: y };
+      if (animate) animateView(app.fitView);
+      else {
+        app.view.zoom = z;
+        app.view.panX = x;
+        app.view.panY = y;
+      }
     }
 
     var zMax = clamp(Math.floor(Math.min(r.width, r.height) * 0.8 / size), 1, MAX_ZOOM);
-    for (var z = zMax; z >= 1; z--) {
+    // First choice: centred in the whole canvas, giving up a little zoom if a card is in the way.
+    var zMin = Math.max(1, Math.ceil(zMax * 0.7)), z;
+    for (z = zMax; z >= zMin; z--) {
+      var cs = size * z, cx0 = (r.width - cs) / 2, cy0 = (r.height - cs) / 2;
+      if (clear(cx0, cy0, cs)) return place(z, cx0, cy0);
+    }
+    for (z = zMax; z >= 1; z--) {
       var s = size * z;
       for (var i = 0; i < regions.length; i++) {
         var g = regions[i];
@@ -282,6 +313,30 @@
     v.zoom = nz;
   }
 
+  // Eases the view to `target` ({zoom, panX, panY}). Instant with reduced motion.
+  var viewAnim = null;
+  function animateView(target) {
+    var v = app.view;
+    if (viewAnim) cancelAnimationFrame(viewAnim);
+    viewAnim = null;
+    if (REDUCED_MOTION || !app.booted) {
+      v.zoom = target.zoom; v.panX = target.panX; v.panY = target.panY;
+      renderAll();
+      return;
+    }
+    var from = { zoom: v.zoom, panX: v.panX, panY: v.panY }, t0 = performance.now(), dur = 200;
+    function frame(now) {
+      var t = clamp((now - t0) / dur, 0, 1), e = 1 - Math.pow(1 - t, 3);
+      v.zoom = from.zoom + (target.zoom - from.zoom) * e;
+      v.panX = from.panX + (target.panX - from.panX) * e;
+      v.panY = from.panY + (target.panY - from.panY) * e;
+      if (t >= 1) { v.zoom = target.zoom; v.panX = target.panX; v.panY = target.panY; viewAnim = null; }
+      else viewAnim = requestAnimationFrame(frame);
+      renderAll();
+    }
+    viewAnim = requestAnimationFrame(frame);
+  }
+
   function stepZoom(dir) {
     var cur = app.view.zoom, next = cur, i;
     if (dir > 0) {
@@ -290,9 +345,9 @@
       for (i = ZOOM_STEPS.length - 1; i >= 0; i--) if (ZOOM_STEPS[i] < cur) { next = ZOOM_STEPS[i]; break; }
     }
     if (next === cur) return;
-    var r = canvasRect();
-    zoomAround(r.width / 2, r.height / 2, next);
-    renderAll();
+    var r = canvasRect(), v = app.view, mx = r.width / 2, my = r.height / 2;
+    var dx = (mx - v.panX) / v.zoom, dy = (my - v.panY) / v.zoom;
+    animateView({ zoom: next, panX: mx - dx * next, panY: my - dy * next });
   }
 
   /* ---------- rendering ---------- */
@@ -310,7 +365,7 @@
   }
 
   function renderAll() {
-    R.renderDoc(app.canvas, app.doc, app.view);
+    R.renderDoc(app.canvas, app.doc, app.view, { bg: app.state.artboardBg });
     app.canvas.gridG.setAttribute("display", app.state.grid ? "inline" : "none");
     IM.Overlay.render(app);
     renderPreviewCard();
@@ -321,6 +376,7 @@
     }
     updateHint();
     updateZoomLabel();
+    for (var h = 0; h < app.renderHooks.length; h++) app.renderHooks[h]();
     IM.io.autosave(app.doc);
   }
 
@@ -366,20 +422,24 @@
     refreshStyle();
     updateSizeChips();
     syncHistoryButtons();
+    for (var h = 0; h < app.panelHooks.length; h++) app.panelHooks[h]();
   }
 
   function updateSizeChips() {
     qsa("#size-group .chip").forEach(function (c) {
-      c.classList.toggle("sel", +c.getAttribute("data-size") === app.doc.size);
+      var on = +c.getAttribute("data-size") === app.doc.size;
+      c.classList.toggle("sel", on);
+      c.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
 
   /* ---------- toast ---------- */
 
   var toastTimer = null;
-  function toast(msg) {
+  function toast(msg, opts) {
     var t = qs("#toast");
-    t.textContent = msg;
+    qs("#toast-text").textContent = msg;
+    t.classList.toggle("success", !!(opts && opts.success));
     t.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1800);
@@ -432,7 +492,7 @@
   function setSize(s) {
     if (s === app.doc.size) return;
     pushHistory("Change size", { type: "size", from: app.doc.size, to: s });
-    fit();
+    fit(true);
     renderAll();
     toast("Icon size " + s + " × " + s + " px");
   }
@@ -467,6 +527,24 @@
   }
 
   var dragging = false, panning = false, panLast = null;
+  var touches = {}, pinch = null;
+
+  // Stops a drag the tool has started without committing it (second finger, long press).
+  function cancelGesture() {
+    if (!dragging) return;
+    dragging = false;
+    var tool = IM.Tools[app.state.tool];
+    if (tool && tool.deactivate) tool.deactivate(app);
+    if (tool && tool.activate) tool.activate(app);
+    endTx();
+    app.state.ghost = null;
+    app.state.marquee = null;
+    renderAll();
+  }
+
+  function touchList() {
+    return Object.keys(touches).map(function (k) { return touches[k]; });
+  }
 
   function wireCanvas() {
     var svg = app.canvas.svg;
@@ -474,6 +552,25 @@
     svg.addEventListener("pointerdown", function (ev) {
       if (ev.button === 2) return;
       try { svg.setPointerCapture(ev.pointerId); } catch (err) { /* not supported: ignore */ }
+      app.state.pointerDown = true;
+      if (ev.pointerType === "touch") {
+        touches[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+        var tl = touchList();
+        if (tl.length === 2) {
+          // two fingers: pinch to zoom and drag to pan
+          cancelGesture();
+          var r0 = canvasRect(), v0 = app.view;
+          var mx = (tl[0].x + tl[1].x) / 2 - r0.left, my = (tl[0].y + tl[1].y) / 2 - r0.top;
+          pinch = {
+            d0: Math.max(1, Math.hypot(tl[0].x - tl[1].x, tl[0].y - tl[1].y)),
+            z0: v0.zoom,
+            px: (mx - v0.panX) / v0.zoom,
+            py: (my - v0.panY) / v0.zoom
+          };
+          return;
+        }
+        if (pinch) return;
+      }
       if (app.state.space || ev.button === 1) {
         panning = true;
         panLast = { x: ev.clientX, y: ev.clientY };
@@ -485,6 +582,22 @@
     });
 
     svg.addEventListener("pointermove", function (ev) {
+      if (ev.pointerType === "touch" && touches[ev.pointerId]) {
+        touches[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+        if (pinch) {
+          var tl = touchList();
+          if (tl.length < 2) return;
+          var r1 = canvasRect();
+          var d = Math.max(1, Math.hypot(tl[0].x - tl[1].x, tl[0].y - tl[1].y));
+          var z = clamp(pinch.z0 * d / pinch.d0, 1, MAX_ZOOM);
+          var mx = (tl[0].x + tl[1].x) / 2 - r1.left, my = (tl[0].y + tl[1].y) / 2 - r1.top;
+          app.view.zoom = z;
+          app.view.panX = mx - pinch.px * z;
+          app.view.panY = my - pinch.py * z;
+          requestRender();
+          return;
+        }
+      }
       if (panning) {
         app.view.panX += ev.clientX - panLast.x;
         app.view.panY += ev.clientY - panLast.y;
@@ -496,6 +609,14 @@
     });
 
     function finishUp(ev) {
+      app.state.pointerDown = false;
+      if (ev.pointerType === "touch") {
+        delete touches[ev.pointerId];
+        if (pinch) {
+          if (!touchList().length) pinch = null;
+          return;
+        }
+      }
       if (panning) {
         panning = false;
         panLast = null;
@@ -505,6 +626,7 @@
       dragging = false;
       try { svg.releasePointerCapture(ev.pointerId); } catch (err) { /* ignore */ }
       dispatch("up", norm(ev, "up"));
+      if (IM.Snap.guides.length) { IM.Snap.clear(); requestRender(); }   // no guide stays after the drag
     }
     svg.addEventListener("pointerup", finishUp);
     svg.addEventListener("pointercancel", finishUp);
@@ -709,11 +831,14 @@
   function syncShapeButtons() {
     var sel = selectedPaths(), hasGroup = sel.some(function (p) { return !!p.groupId; });
     var mergeOk = !IM.Merge.problemOf(sel);
-    qs("#shape-group").disabled = sel.length < 2;
-    qs("#shape-ungroup").disabled = !hasGroup;
-    ["union", "subtract", "intersect", "exclude"].forEach(function (k) {
-      qs("#shape-" + k).disabled = !mergeOk;
-    });
+    // aria-disabled (not disabled) so the tooltip still shows and a click explains what is needed
+    function setOff(id, off) {
+      var b = qs(id), v = off ? "true" : "false";
+      if (b.getAttribute("aria-disabled") !== v) b.setAttribute("aria-disabled", v);
+    }
+    setOff("#shape-group", sel.length < 2);
+    setOff("#shape-ungroup", !hasGroup);
+    ["union", "subtract", "intersect", "exclude"].forEach(function (k) { setOff("#shape-" + k, !mergeOk); });
   }
 
   // Moves the selected shape one step (or to the front/back) within its layer.
@@ -762,8 +887,7 @@
 
   function onKeyDown(ev) {
     if (isEditable(ev.target)) return;
-    var dialog = qs("#help");
-    if (dialog && dialog.open) return;
+    if (qs("dialog[open]")) return;
     var k = ev.key;
 
     if (k === " ") {
@@ -823,13 +947,14 @@
       openHelp();
       return;
     }
+    if (app.keyHook && app.keyHook(ev)) { ev.preventDefault(); return; }
     if (k.length !== 1) return;
 
     var lower = k.toLowerCase();
     if (IM.Tools.keys[lower]) { setTool(IM.Tools.keys[lower]); return; }
     if (lower === "s") { toggleSnap(); return; }
     if (k === "`") { toggleGrid(); return; }
-    if (k === "0") { fit(); renderAll(); return; }
+    if (k === "0") { fit(true); return; }
     if (k === "+" || k === "=") { stepZoom(1); return; }
     if (k === "-" || k === "_") { stepZoom(-1); return; }
     if (k >= "1" && k <= "4") { setSize(SIZES[+k - 1]); return; }
@@ -853,43 +978,109 @@
     for (var r = app.doc.layers.length - 1; r >= 0; r--) {
       list.appendChild(makeLayerRow(app.doc.layers[r], r));
     }
+    var idx = activeLayerIndex();
     qs("#layer-del").disabled = app.doc.layers.length <= 1;
+    qs("#layer-up").disabled = idx >= app.doc.layers.length - 1;
+    qs("#layer-down").disabled = idx <= 0;
+    // keep keyboard focus on the row that had it before the rebuild
+    if (app.focusLayerId) {
+      var keep = list.querySelector('[data-layer-id="' + app.focusLayerId + '"]');
+      app.focusLayerId = null;
+      if (keep) keep.focus();
+    }
+  }
+
+  // Moves the active layer up (dir 1) or down (dir -1) in the stack.
+  function moveLayer(dir) {
+    var idx = activeLayerIndex(), to = idx + dir;
+    if (to < 0 || to >= app.doc.layers.length) return;
+    app.focusLayerId = document.activeElement && document.activeElement.classList.contains("layer-item") ? app.doc.activeLayerId : null;
+    pushHistory("Reorder layers", { type: "layer-move", from: idx, to: to });
   }
 
   function makeLayerRow(L, idx) {
     var row = mk("div", "layer-item");
     row.setAttribute("data-layer-id", L.id);
-    row.setAttribute("draggable", "true");
-    if (L.id === app.doc.activeLayerId) row.classList.add("active");
+    row.draggable = false;            // turned on by a press on the row itself (see pointerdown below)
+    row.setAttribute("role", "option");
+    row.setAttribute("tabindex", "0");
+    var active = L.id === app.doc.activeLayerId;
+    row.setAttribute("aria-selected", active ? "true" : "false");
+    row.setAttribute("aria-label", L.name + (L.visible ? "" : ", hidden") + (L.locked ? ", locked" : "") +
+      ", " + L.paths.length + (L.paths.length === 1 ? " shape" : " shapes"));
+    if (active) row.classList.add("active");
+    if (!L.visible) row.classList.add("hidden-layer");
 
     var eye = mk("button", "eye" + (L.visible ? " on" : ""));
-    eye.innerHTML = EYE_SVG;
+    eye.innerHTML = L.visible ? EYE_SVG : EYE_OFF_SVG;
     eye.setAttribute("aria-label", L.visible ? "Hide " + L.name : "Show " + L.name);
-    eye.title = L.visible ? "Hide layer" : "Show layer";
+    eye.setAttribute("aria-pressed", L.visible ? "true" : "false");
+    eye.setAttribute("data-tip", L.visible ? "Hide layer" : "Show layer");
+    eye.tabIndex = -1;
     var lock = mk("button", "lock" + (L.locked ? " on" : ""));
-    lock.innerHTML = LOCK_SVG;
+    lock.innerHTML = L.locked ? LOCK_SVG : LOCK_OPEN_SVG;
     lock.setAttribute("aria-label", L.locked ? "Unlock " + L.name : "Lock " + L.name);
-    lock.title = L.locked ? "Unlock layer" : "Lock layer";
+    lock.setAttribute("aria-pressed", L.locked ? "true" : "false");
+    lock.setAttribute("data-tip", L.locked ? "Unlock layer" : "Lock layer");
+    lock.tabIndex = -1;
 
     var thumb = mk("div", "thumb");
     var tsvg = document.createElementNS(NS, "svg");
     thumb.appendChild(tsvg);
-    R.renderPreview(tsvg, { version: 1, size: app.doc.size, activeLayerId: L.id, layers: [L] }, 24 / app.doc.size);
+    // The thumbnail always shows the layer's contents, even when the layer is hidden
+    // or see-through, so you can still tell what is on it.
+    var shown = {};
+    for (var key in L) if (Object.prototype.hasOwnProperty.call(L, key)) shown[key] = L[key];
+    shown.visible = true;
+    shown.opacity = 1;
+    R.renderPreview(tsvg, { version: 1, size: app.doc.size, activeLayerId: L.id, layers: [shown] }, 24 / app.doc.size);
 
     var name = mk("span", "name");
     name.textContent = L.name;
-    name.title = "Double-click to rename";
+    name.setAttribute("data-tip", "Double-click or press F2 to rename");
 
     var opacity = mk("input", "lopacity");
     opacity.type = "range";
     opacity.min = 0; opacity.max = 1; opacity.step = 0.05;
     opacity.value = L.opacity;
     opacity.setAttribute("aria-label", "Opacity of " + L.name);
-    opacity.title = "Layer opacity";
+    opacity.setAttribute("aria-valuetext", Math.round(L.opacity * 100) + "%");
+    opacity.setAttribute("data-tip", "Layer opacity");
+    opacity.tabIndex = -1;
+    var opacityVal = mk("span", "lop-val");
+    opacityVal.textContent = Math.round(L.opacity * 100) + "%";
+    opacityVal.setAttribute("aria-hidden", "true");
+
+    // name on top, opacity slider and its percentage underneath
+    var info = mk("div", "info");
+    var lop = mk("div", "lop");
+    lop.appendChild(opacity);
+    lop.appendChild(opacityVal);
+    info.appendChild(name);
+    info.appendChild(lop);
 
     row.addEventListener("click", function () {
       setActiveLayer(L.id);
       renderAll();
+    });
+
+    // keyboard: arrows move between rows, Alt+arrows reorder, F2 renames, H/L toggle eye and lock
+    row.addEventListener("keydown", function (ev) {
+      if (ev.target !== row) return;
+      var k = ev.key, handled = true;
+      if (k === "Enter" || k === " ") { setActiveLayer(L.id); app.focusLayerId = L.id; markDirty(); renderAll(); }
+      else if ((k === "ArrowUp" || k === "ArrowDown") && ev.altKey) {
+        setActiveLayer(L.id);
+        moveLayer(k === "ArrowUp" ? 1 : -1);
+      } else if (k === "ArrowUp" || k === "ArrowDown") {
+        var sib = k === "ArrowUp" ? row.previousElementSibling : row.nextElementSibling;
+        if (sib) sib.focus();
+      } else if (k === "F2") {
+        name.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+      } else if (k === "h" || k === "H") { app.focusLayerId = L.id; eye.click(); }
+      else if (k === "l" || k === "L") { app.focusLayerId = L.id; lock.click(); }
+      else handled = false;
+      if (handled) { ev.preventDefault(); ev.stopPropagation(); }
     });
 
     eye.addEventListener("click", function (ev) {
@@ -913,11 +1104,18 @@
         pushHistory("Layer opacity", { type: "layer-style", layerId: L.id, field: "opacity", from: from, to: L.opacity }, { applied: true });
       }
     }
-    opacity.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); beginOpacity(); });
+    opacity.addEventListener("pointerdown", function (ev) {
+      ev.stopPropagation();
+      row.draggable = false;          // dragging the slider must never drag the row
+      beginOpacity();
+    });
     opacity.addEventListener("click", function (ev) { ev.stopPropagation(); });
     opacity.addEventListener("input", function () {
       beginOpacity();
       L.opacity = parseFloat(opacity.value);
+      var pct = Math.round(L.opacity * 100) + "%";
+      opacityVal.textContent = pct;
+      opacity.setAttribute("aria-valuetext", pct);
       requestRender();
     });
     opacity.addEventListener("change", endOpacity);
@@ -931,7 +1129,7 @@
       input.maxLength = 60;
       input.setAttribute("aria-label", "Layer name");
       app.renameEditing = true;
-      row.replaceChild(input, name);
+      name.parentNode.replaceChild(input, name);
       input.focus();
       input.select();
       var done = false;
@@ -955,22 +1153,36 @@
       input.addEventListener("blur", function () { finish(true); });
     });
 
+    // Only a press on the row itself starts a drag to reorder; the opacity slider
+    // and the rename box keep the pointer for themselves.
+    row.addEventListener("pointerdown", function (ev) {
+      row.draggable = !(ev.target.closest && ev.target.closest("input"));
+    });
     row.addEventListener("dragstart", function (ev) {
+      if (!row.draggable || (ev.target.closest && ev.target.closest("input"))) {
+        ev.preventDefault();
+        return;
+      }
       app.dragLayerId = L.id;
       row.classList.add("dragging");
       ev.dataTransfer.effectAllowed = "move";
       try { ev.dataTransfer.setData("text/plain", L.id); } catch (err) { /* some browsers */ }
     });
+    row.addEventListener("pointerup", function () { row.draggable = false; });
     row.addEventListener("dragend", function () {
+      row.draggable = false;
       row.classList.remove("dragging");
       app.dragLayerId = null;
     });
     row.addEventListener("dragover", function (ev) {
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "move";
+      row.classList.add("drop-target");
     });
+    row.addEventListener("dragleave", function () { row.classList.remove("drop-target"); });
     row.addEventListener("drop", function (ev) {
       ev.preventDefault();
+      row.classList.remove("drop-target");
       var from = M.layerIndex(app.doc, app.dragLayerId);
       app.dragLayerId = null;
       if (from < 0 || from === idx) return;
@@ -980,8 +1192,7 @@
     row.appendChild(eye);
     row.appendChild(lock);
     row.appendChild(thumb);
-    row.appendChild(name);
-    row.appendChild(opacity);
+    row.appendChild(info);
     return row;
   }
 
@@ -1233,9 +1444,19 @@
     toast("Saved icon-" + app.doc.size + ".iconmaker.json");
   }
 
+  // Asks before replacing a drawing: Cancel, Save first, or Continue (ui.js draws the dialog).
+  function confirmReplace(title, body, okLabel, then) {
+    if (!hasDrawing()) { then(); return; }
+    app.confirm({ title: title, body: body, ok: okLabel, save: true }, function (answer) {
+      if (answer === "save") { saveProject(); then(); }
+      else if (answer === "ok") then();
+    });
+  }
+
   function openProject() {
-    if (hasDrawing() && !window.confirm("Open a saved icon? This replaces the drawing on screen.")) return;
-    qs("#open-file").click();
+    confirmReplace("Open a saved icon?", "This replaces the drawing on screen. Save it first if you want to keep it.", "Open anyway", function () {
+      qs("#open-file").click();
+    });
   }
 
   function setupDoc(doc) {
@@ -1255,9 +1476,10 @@
   }
 
   function newIcon() {
-    if (hasDrawing() && !window.confirm("Start a new icon? The drawing on screen will be cleared. Save it first to keep it.")) return;
-    setupDoc(M.newDoc(app.doc.size));
-    toast("New icon");
+    confirmReplace("Start a new icon?", "The drawing on screen will be cleared. Save it first if you want to keep it.", "Clear and start", function () {
+      setupDoc(M.newDoc(app.doc.size));
+      toast("New icon");
+    });
   }
 
   function openHelp() {
@@ -1292,21 +1514,9 @@
         toast("Opened " + file.name);
       });
     });
-    qs("#export-svg").addEventListener("click", function () {
-      IM.Export.downloadSVG(app.doc, app.doc.size);
-      toast("SVG saved");
-    });
-    qs("#export-png").addEventListener("click", function () {
-      IM.Export.downloadPNG(app.doc, app.doc.size, function (ok) {
-        toast(ok ? "PNG saved" : "Could not make the PNG");
-      });
-    });
-    qs("#export-all").addEventListener("click", function () {
-      toast("Saving PNG files…");
-      IM.Export.exportAll(app.doc, function (n) { toast(n + " PNG files saved"); });
-    });
     qs("#help-btn").addEventListener("click", openHelp);
     qs("#help-close").addEventListener("click", function () { qs("#help").close(); });
+    qs("#help-x").addEventListener("click", function () { qs("#help").close(); });
     // a click outside the window (on the dimmed backdrop) closes it
     qs("#help").addEventListener("click", function (ev) {
       var r = this.getBoundingClientRect();
@@ -1331,21 +1541,38 @@
     qs("#grid-toggle").addEventListener("click", toggleGrid);
     qs("#zoom-out").addEventListener("click", function () { stepZoom(-1); });
     qs("#zoom-in").addEventListener("click", function () { stepZoom(1); });
-    qs("#zoom-fit").addEventListener("click", function () { fit(); renderAll(); });
+    qs("#zoom-fit").addEventListener("click", function () { fit(true); });
   }
 
   function wirePanels() {
-    function showTab(which) {
-      var layers = which === "layers";
-      qs("#panel-layers").classList.toggle("hidden", !layers);
-      qs("#panel-style").classList.toggle("hidden", layers);
-      qs("#tab-layers").classList.toggle("sel", layers);
-      qs("#tab-style").classList.toggle("sel", !layers);
-      qs("#tab-layers").setAttribute("aria-selected", layers ? "true" : "false");
-      qs("#tab-style").setAttribute("aria-selected", layers ? "false" : "true");
+    var TABS = ["layers", "style", "history"];
+    function showTab(which, focus) {
+      TABS.forEach(function (t) {
+        var on = t === which, tab = qs("#tab-" + t);
+        qs("#panel-" + t).classList.toggle("hidden", !on);
+        tab.classList.toggle("sel", on);
+        tab.setAttribute("aria-selected", on ? "true" : "false");
+        tab.tabIndex = on ? 0 : -1;
+        if (on && focus) tab.focus();
+      });
+      app.panelTab = which;
+      markDirty();
+      renderAll();
     }
-    qs("#tab-layers").addEventListener("click", function () { showTab("layers"); });
-    qs("#tab-style").addEventListener("click", function () { showTab("style"); });
+    app.showTab = showTab;
+    TABS.forEach(function (t, i) {
+      var tab = qs("#tab-" + t);
+      tab.addEventListener("click", function () { showTab(t); });
+      tab.addEventListener("keydown", function (ev) {
+        var d = ev.key === "ArrowRight" ? 1 : ev.key === "ArrowLeft" ? -1 : 0;
+        if (!d) return;
+        ev.preventDefault();
+        showTab(TABS[(i + d + TABS.length) % TABS.length], true);
+      });
+    });
+    app.panelTab = "style";
+    qs("#layer-up").addEventListener("click", function () { moveLayer(1); });
+    qs("#layer-down").addEventListener("click", function () { moveLayer(-1); });
 
     qs("#shape-group").addEventListener("click", groupSelection);
     qs("#shape-ungroup").addEventListener("click", ungroupSelection);
@@ -1465,13 +1692,14 @@
       var cell = document.createElement("div");
       cell.className = "mini-cell";
       var box = document.createElement("div");
-      box.className = "mini-box";
+      box.className = "mini-box checker";
       var sv = document.createElementNS(NS, "svg");
       sv.setAttribute("class", "mini");
       sv.setAttribute("role", "img");
       sv.setAttribute("aria-label", "The icon at " + s + " by " + s + " pixels");
       box.appendChild(sv);
       cell.appendChild(box);
+      cell.setAttribute("data-size", s);
       var label = document.createElement("span");
       label.className = "mini-label";
       label.textContent = s + " px";
@@ -1567,6 +1795,8 @@
     updateToggles();
     setTool("select");
     app.canvas.svg.classList.add("tool-select");
+    app.booted = true;
+    if (app.onBoot) app.onBoot();
     renderAll();
   }
 
@@ -1588,6 +1818,34 @@
   app.fit = fit;
   app.undo = undo;
   app.redo = redo;
+  app.historyJump = historyJump;
+  app.markDirty = markDirty;
+  app.selectedPaths = selectedPaths;
+  app.primaryPath = primaryPath;
+  app.hasDrawing = hasDrawing;
+  app.stepZoom = stepZoom;
+  app.setSize = setSize;
+  app.saveProject = saveProject;
+  app.openProject = openProject;
+  app.newIcon = newIcon;
+  app.openHelp = openHelp;
+  app.toggleSnap = toggleSnap;
+  app.toggleGrid = toggleGrid;
+  app.copySelection = copySelection;
+  app.pasteSelection = pasteSelection;
+  app.duplicateSelection = duplicateSelection;
+  app.deleteSelection = deleteSelection;
+  app.selectAll = selectAll;
+  app.changeOrder = changeOrder;
+  app.moveSelectionToLayer = moveSelectionToLayer;
+  app.addLayer = addLayer;
+  app.duplicateLayer = duplicateLayer;
+  app.deleteLayer = deleteLayer;
+  app.moveLayer = moveLayer;
+  app.cancelGesture = cancelGesture;
+  app.styleChange = styleChange;
+  app.setFillKind = function (k) { styleChange("Fill style", function () { setFillKind(k); }); markDirty(); renderAll(); };
+  app.isEditable = isEditable;
   app.groupSelection = groupSelection;
   app.ungroupSelection = ungroupSelection;
   app.mergeSelection = mergeSelection;

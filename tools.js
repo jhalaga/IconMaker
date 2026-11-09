@@ -1199,6 +1199,7 @@ var IM = (window.IM = window.IM || {});
     },
     // helpers shared with the app shell
     gradientFor: gradientFor,
-    newPathFromState: newPathFromState
+    newPathFromState: newPathFromState,
+    shapeGeom: shapeGeom
   };
 })();
