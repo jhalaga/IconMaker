@@ -806,7 +806,7 @@ var IM = (window.IM = window.IM || {});
   function applyStroke(app, hit) {
     var st = app.state, p = hit.path;
     painting.seen[p.id] = true;
-    var to = { color: st.strokeColor, width: st.strokeWidth, opacity: st.strokeOpacity, cap: "round", join: "round" };
+    var to = { color: st.strokeColor, width: st.strokeWidth, opacity: st.strokeOpacity, cap: st.strokeCap || "round", join: st.strokeJoin || "round" };
     app.pushHistory("Stroke", { type: "style", layerId: hit.layerId, id: p.id, field: "stroke", from: M.clone(p.stroke), to: to });
     var dash = st.dash && st.dash !== "none" ? { pattern: st.dash } : null;
     if (JSON.stringify(dash) !== JSON.stringify(p.dash)) {

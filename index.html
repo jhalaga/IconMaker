@@ -22,7 +22,7 @@
 <a class="skip-link" href="#canvas">Skip to the drawing area</a>
 
 <header id="topbar" class="glass-card">
-  <span class="brand"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><path d="M8 15.5 12 7.5l4 8" /><path d="M9.5 12.5h5" /></svg><span class="brand-info"><span>IconMaker</span><button id="release-notes-btn" class="version-btn" type="button" aria-label="Release notes" aria-haspopup="dialog" aria-controls="release-notes-dlg" data-tip="What’s new in IconMaker"><span id="app-version"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" /></svg></button></span></span>
+  <span class="brand"><img class="brand-mark" src="favicon.svg" alt="" width="28" height="28" /><span class="brand-info"><span>IconMaker</span><button id="release-notes-btn" class="version-btn" type="button" aria-label="Release notes" aria-haspopup="dialog" aria-controls="release-notes-dlg" data-tip="What’s new in IconMaker"><span id="app-version"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" /></svg></button></span></span>
   <div class="tb-sep wide-only"></div>
   <div class="tb-group wide-only" id="size-group" role="group" aria-label="Icon size">
     <button class="chip" data-size="16" aria-pressed="false" data-tip="16 × 16 pixels (key 1)">16</button>
@@ -232,6 +232,21 @@
           <button class="dash" data-dash="dot" aria-pressed="false" aria-label="Dotted line" data-tip="Dotted"><svg viewBox="0 0 24 24"><circle cx="4.5" cy="12" r="1.5" class="dot" /><circle cx="9.5" cy="12" r="1.5" class="dot" /><circle cx="14.5" cy="12" r="1.5" class="dot" /><circle cx="19.5" cy="12" r="1.5" class="dot" /></svg></button>
           <button class="dash" data-dash="dashdot" aria-pressed="false" aria-label="Dash and dot line" data-tip="Dash and dot"><svg viewBox="0 0 24 24"><path d="M3 12h5M16 12h5" /><circle cx="12" cy="12" r="1.5" class="dot" /></svg></button>
         </div>
+        <div class="stroke-options">
+          <span id="line-ends-label" class="stroke-option-label">Line ends</span>
+          <div class="seg-row" role="group" aria-labelledby="line-ends-label">
+            <button class="seg stroke-option" data-stroke-cap="butt" aria-pressed="false" aria-label="Butt line ends" data-tip="Flat ends at the endpoints"><svg viewBox="0 0 32 24" aria-hidden="true"><path class="cap-guide" d="M8 3v18M24 3v18" /><path d="M8 12h16" stroke-width="7" stroke-linecap="butt" /></svg><span>Butt</span></button>
+            <button class="seg stroke-option sel" data-stroke-cap="round" aria-pressed="true" aria-label="Round line ends" data-tip="Rounded ends"><svg viewBox="0 0 32 24" aria-hidden="true"><path class="cap-guide" d="M8 3v18M24 3v18" /><path d="M8 12h16" stroke-width="7" stroke-linecap="round" /></svg><span>Round</span></button>
+            <button class="seg stroke-option" data-stroke-cap="square" aria-pressed="false" aria-label="Square line ends" data-tip="Square ends extending past the endpoints"><svg viewBox="0 0 32 24" aria-hidden="true"><path class="cap-guide" d="M8 3v18M24 3v18" /><path d="M8 12h16" stroke-width="7" stroke-linecap="square" /></svg><span>Square</span></button>
+          </div>
+          <p id="round-dot-note" class="stroke-option-note hidden">Dotted lines use round ends to keep the dots visible.</p>
+          <span id="line-joins-label" class="stroke-option-label">Line joins</span>
+          <div class="seg-row" role="group" aria-labelledby="line-joins-label">
+            <button class="seg stroke-option" data-stroke-join="miter" aria-pressed="false" aria-label="Miter line joins" data-tip="Sharp, pointed corners"><svg viewBox="0 0 32 24" aria-hidden="true"><path d="m7 19 9-12 9 12" stroke-width="6" stroke-linejoin="miter" stroke-linecap="butt" /></svg><span>Miter</span></button>
+            <button class="seg stroke-option sel" data-stroke-join="round" aria-pressed="true" aria-label="Round line joins" data-tip="Rounded corners"><svg viewBox="0 0 32 24" aria-hidden="true"><path d="m7 19 9-12 9 12" stroke-width="6" stroke-linejoin="round" stroke-linecap="butt" /></svg><span>Round</span></button>
+            <button class="seg stroke-option" data-stroke-join="bevel" aria-pressed="false" aria-label="Bevel line joins" data-tip="Flat, clipped corners"><svg viewBox="0 0 32 24" aria-hidden="true"><path d="m7 19 9-12 9 12" stroke-width="6" stroke-linejoin="bevel" stroke-linecap="butt" /></svg><span>Bevel</span></button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -381,7 +396,7 @@
       <dt>Line (L)</dt><dd>Drag to draw a straight line. Hold Shift to snap the angle.</dd>
       <dt>Add object</dt><dd>Choose a rectangle (R), rounded rectangle, oval (E), triangle, diamond, pentagon, hexagon, star, heart, arrow or plus, then drag to draw. Hold Shift for equal width and height; Alt rounds rectangle corners. New objects start with the default style. Select the correct layer before selecting or editing its shapes.</dd>
       <dt>Fill (G)</dt><dd>Click inside a shape to fill it with the current colour. Drag across several shapes to fill them all.</dd>
-      <dt>Outline (K)</dt><dd>Click a shape's edge to give it the current line style. Drag across several edges to change them all.</dd>
+      <dt>Outline (K)</dt><dd>Click a shape's edge to give it the current line style. Drag across several edges to change them all. In Border, choose Butt, Round or Square line ends and Miter, Round or Bevel joins.</dd>
       <dt>Edit points (T)</dt><dd>Drag a point or its round handles. Click a small diamond to add a point; double-click a point to delete it. F makes a point smooth or sharp; G opens or closes the line.</dd>
       <dt>Eraser (C)</dt><dd>Click a shape to remove it, or drag across shapes to remove several.</dd>
       <dt>Pick a colour (I)</dt><dd>Click a shape to copy its colour into the Area or Border colour box.</dd>

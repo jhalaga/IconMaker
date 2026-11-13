@@ -244,7 +244,7 @@ button svg .dot { fill: currentColor; stroke: none; }
   padding: 0 4px 0 2px;
   white-space: nowrap;
 }
-.brand-mark { width: 22px; height: 22px; color: var(--accent); stroke-width: 1.9; }
+.brand-mark { width: 28px; height: 28px; flex: none; border-radius: 6px; }
 
 .tb-group { display: flex; align-items: center; gap: 4px; }
 .tb-sep { width: 1px; height: 24px; background: var(--border); margin: 0 2px; flex: none; }
@@ -1387,3 +1387,11 @@ body[data-artboard="dark"] .checker { background: #1a1a1a; }
 .release-entry .release-title { margin: 3px 0 9px; color: var(--ink-2); font-size: 12px; }
 .release-entry ul { margin: 0; padding-left: 17px; color: var(--ink-2); font-size: 12px; line-height: 1.6; }
 .release-entry li + li { margin-top: 4px; }
+
+/* Standard stroke caps and joins, illustrated at a readable size. */
+.stroke-options { margin-top: 14px; }
+.stroke-option-label { display: block; margin: 12px 0 6px; color: var(--ink-2); font-size: 12px; }
+.stroke-option { display: flex; height: auto; min-height: 54px; flex: 1; flex-direction: column; align-items: center; gap: 3px; padding: 7px 4px; font-size: 11px; }
+.stroke-option svg { width: 32px; height: 24px; }
+.stroke-option .cap-guide { stroke-width: 1; stroke-dasharray: 2 2; opacity: 0.35; }
+.stroke-option-note { margin: 6px 0 0; color: var(--ink-3); font-size: 11px; line-height: 1.4; }

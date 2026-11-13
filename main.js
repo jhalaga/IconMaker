@@ -54,6 +54,8 @@
       strokeWidth: 2,               // default thickness for lines, pen and pencil
       shapeWidth: 0,                // default border thickness for rectangles and ovals
       strokeOpacity: 1,
+      strokeCap: "round",
+      strokeJoin: "round",
       dash: "none",                 // "none" | "dash" | "dot" | "dashdot"
       gradient: { stops: [
         { offset: 0, color: "#000000", opacity: 1 },
@@ -126,6 +128,8 @@
     // thickness is deliberately not copied: the panel reads it from the
     // selected shape, and the line/shape defaults stay what the user chose
     st.strokeOpacity = p.stroke.opacity;
+    st.strokeCap = p.stroke.cap || "round";
+    st.strokeJoin = p.stroke.join || "round";
     st.dash = p.dash && p.dash.pattern ? p.dash.pattern : "none";
     st.gradSel = clamp(st.gradSel, 0, st.gradient.stops.length - 1);
   }
@@ -206,6 +210,7 @@
   function afterHistoryChange() {
     ensureActiveLayer();
     pruneSelection();
+    syncStateFromSelection();
     markDirty();
     renderAll();
     syncHistoryButtons();
@@ -1365,6 +1370,18 @@
     forSelected(function (p) { p.stroke.width = w; });
   }
 
+  function setStrokeCap(cap) {
+    if (["butt", "round", "square"].indexOf(cap) < 0) return;
+    app.state.strokeCap = cap;
+    forSelected(function (p) { p.stroke.cap = cap; });
+  }
+
+  function setStrokeJoin(join) {
+    if (["miter", "round", "bevel"].indexOf(join) < 0) return;
+    app.state.strokeJoin = join;
+    forSelected(function (p) { p.stroke.join = join; });
+  }
+
   function setDash(d) {
     app.state.dash = d;
     forSelected(function (p) { p.dash = d === "none" ? null : { pattern: d }; });
@@ -1398,6 +1415,18 @@
       b.classList.toggle("sel", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
+    var selected = selectedPaths();
+    ["cap", "join"].forEach(function (field) {
+      var primary = primaryPath();
+      var value = primary ? primary.stroke[field] : field === "cap" ? st.strokeCap : st.strokeJoin;
+      var mixed = selected.some(function (p) { return p.stroke[field] !== value; });
+      qsa("[data-stroke-" + field + "]").forEach(function (button) {
+        var on = !mixed && button.getAttribute("data-stroke-" + field) === value;
+        button.classList.toggle("sel", on);
+        button.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+    qs("#round-dot-note").classList.toggle("hidden", st.dash !== "dot");
     renderGradBar();
   }
 
@@ -1675,6 +1704,16 @@
       });
     });
 
+    ["cap", "join"].forEach(function (field) {
+      qsa("[data-stroke-" + field + "]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var value = button.getAttribute("data-stroke-" + field);
+          if (field === "cap") app.setStrokeCap(value);
+          else app.setStrokeJoin(value);
+        });
+      });
+    });
+
     qs("#z-front").addEventListener("click", function () { changeOrder(1, true); });
     qs("#z-fwd").addEventListener("click", function () { changeOrder(1, false); });
     qs("#z-bwd").addEventListener("click", function () { changeOrder(-1, false); });
@@ -1835,6 +1874,14 @@
   app.requestRender = requestRender;
   app.setTool = setTool;
   app.setFillColor = function (c) { styleChange("Fill colour", function () { setFillColor(c); }); };
+  app.setStrokeCap = function (cap) {
+    styleChange("Line ends", function () { setStrokeCap(cap); });
+    markDirty(); renderAll();
+  };
+  app.setStrokeJoin = function (join) {
+    styleChange("Line joins", function () { setStrokeJoin(join); });
+    markDirty(); renderAll();
+  };
   app.setStrokeColor = function (c) { styleChange("Outline colour", function () { setStrokeColor(c); }); };
   app.fit = fit;
   app.undo = undo;

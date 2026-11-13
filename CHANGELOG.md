@@ -6,6 +6,15 @@ Versions follow semantic versioning: major for breaking changes, minor for new f
 
 
 
+## 1.2.0 — 2026-11-13
+
+Line ends, corners and our logo
+
+- Choose Butt, Round or Square line ends in the Border panel.
+- Choose Miter, Round or Bevel joins for sharp, rounded or clipped corners.
+- Apply end and join styles to selected objects or with the Outline tool, with undo and export support.
+- Show the IconMaker logo in the top panel.
+
 ## 1.1.1 — 2026-11-13
 
 Release notes polish

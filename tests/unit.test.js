@@ -12,7 +12,7 @@ const vm = require("vm");
 const ROOT = path.resolve(__dirname, "..");
 const ctx = vm.createContext({ console, Math, JSON, Date, Array, Object, Number, String });
 ctx.window = ctx;
-for (const f of ["model.js", "renderer.js", "snapping.js", "overlay.js", "io.js", "vendor/polybool.min.js", "merge.js", "tools.js"]) {
+for (const f of ["model.js", "renderer.js", "snapping.js", "overlay.js", "export.js", "io.js", "vendor/polybool.min.js", "merge.js", "tools.js"]) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, f), "utf8"), ctx, { filename: f });
 }
 const IM = ctx.IM;
@@ -1302,6 +1302,65 @@ test("release history matches VERSION and the changelog, with valid versions and
     ok(release.changes.length > 0);
     release.changes.forEach(change => ok(changelog.includes(change)));
   });
+});
+
+test("line ends and joins edit a selection together, preserve other styling, and undo cleanly", () => {
+  const sandbox = vm.createContext({ console, Math, JSON, Date, IM });
+  sandbox.window = sandbox;
+  sandbox.document = { readyState: "loading", addEventListener() {}, querySelector() { return {}; } };
+  // Keep the real shell's selection, style transactions and history; skip DOM rendering.
+  const source = fs.readFileSync(path.join(ROOT, "main.js"), "utf8").replace(
+    '  function renderAll() {', '  function renderAll() { return;');
+  vm.runInContext(source, sandbox, { filename: "main.js" });
+  const app = sandbox.IM.App;
+  const a = basePath([M.pt(2, 2), M.pt(10, 2), M.pt(12, 8)], false);
+  const b = rectPath(15, 15, 8, 8), untouched = rectPath(25, 25, 2, 2);
+  a.stroke.color = "#ab12cd"; a.stroke.width = 5; a.stroke.opacity = 0.4;
+  a.dash = { pattern: "dash" };
+  app.doc = docWith([a, b, untouched]); app.history = new M.History(app.doc);
+  app.select([a.id, b.id], a.id);
+  app.setStrokeCap("square"); app.setStrokeJoin("bevel");
+  eq([a.stroke.cap, b.stroke.cap], ["square", "square"]);
+  eq([a.stroke.join, b.stroke.join], ["bevel", "bevel"]);
+  eq([untouched.stroke.cap, untouched.stroke.join], ["round", "round"]);
+  eq([a.stroke.color, a.stroke.width, a.stroke.opacity, a.dash.pattern], ["#ab12cd", 5, 0.4, "dash"]);
+  eq(app.history.stack.length, 2, "one undo step per control change");
+  app.undo(); eq([a.stroke.join, b.stroke.join], ["round", "round"]);
+  eq(app.state.strokeJoin, "round", "panel state follows undo");
+  app.undo(); eq([a.stroke.cap, b.stroke.cap], ["round", "round"]);
+  app.redo(); app.redo(); eq([a.stroke.cap, a.stroke.join], ["square", "bevel"]);
+  app.select([untouched.id], untouched.id);
+  eq([app.state.strokeCap, app.state.strokeJoin], ["round", "round"], "selection updates the controls");
+  app.setStrokeCap("invalid"); app.setStrokeJoin("invalid");
+  eq([untouched.stroke.cap, untouched.stroke.join], ["round", "round"]);
+  const clean = IM.io.sanitize(JSON.parse(JSON.stringify(app.doc)));
+  eq([clean.layers[0].paths[0].stroke.cap, clean.layers[0].paths[0].stroke.join], ["square", "bevel"]);
+});
+
+test("Outline applies chosen line ends and joins while new lines retain round defaults", () => {
+  const p = basePath([M.pt(2, 2), M.pt(10, 2), M.pt(12, 8)], false);
+  const app = makeApp(docWith([p]));
+  app.state.strokeCap = "butt"; app.state.strokeJoin = "miter";
+  click(app, "stroke", 6, 2);
+  eq([p.stroke.cap, p.stroke.join], ["butt", "miter"]);
+  app.history.undo(); eq([p.stroke.cap, p.stroke.join], ["round", "round"]);
+  down(app, "line", 16, 16); up(app, "line", 24, 24);
+  eq([lastPath(app.doc).stroke.cap, lastPath(app.doc).stroke.join], ["round", "round"]);
+});
+
+test("SVG exports every cap and join combination and keeps dotted lines visible", () => {
+  for (const cap of ["butt", "round", "square"]) {
+    for (const join of ["miter", "round", "bevel"]) {
+      const p = basePath([M.pt(2, 2), M.pt(10, 2), M.pt(12, 8)], false);
+      p.stroke.cap = cap; p.stroke.join = join;
+      const doc = docWith([p]), svg = IM.Export.svg(doc, 32);
+      ok(svg.includes('stroke-linecap="' + cap + '"'));
+      ok(svg.includes('stroke-linejoin="' + join + '"'));
+      p.dash = { pattern: "dot" };
+      ok(IM.Export.svg(doc, 32).includes('stroke-linecap="round"'));
+      eq(p.stroke.cap, cap, "export does not change the saved cap choice");
+    }
+  }
 });
 
 /* ---------- report ---------- */
