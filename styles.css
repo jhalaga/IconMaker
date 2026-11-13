@@ -418,6 +418,15 @@ body.no-keys .tool kbd { display: none; }
 #canvas.tool-line,
 #canvas.tool-rect,
 #canvas.tool-ellipse,
+#canvas.tool-roundedRect,
+#canvas.tool-triangle,
+#canvas.tool-diamond,
+#canvas.tool-pentagon,
+#canvas.tool-hexagon,
+#canvas.tool-star,
+#canvas.tool-heart,
+#canvas.tool-arrow,
+#canvas.tool-plus,
 #canvas.tool-fill,
 #canvas.tool-stroke,
 #canvas.tool-node,
@@ -1355,3 +1364,26 @@ body[data-artboard="light"] .thumb,
 body[data-artboard="light"] .checker { background: #ffffff; }
 body[data-artboard="dark"] .thumb,
 body[data-artboard="dark"] .checker { background: #1a1a1a; }
+
+/* Object chooser remains usable above the bottom toolbar on small screens. */
+.object-menu { max-height: calc(100dvh - 24px); overflow-y: auto; min-width: 225px; }
+.object-menu .menu-item { justify-content: flex-start; gap: 12px; }
+.object-menu .menu-item svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.object-menu .menu-item kbd { margin-left: auto; }
+
+/* A quiet version link in the wordmark, using the shared dialog styling. */
+.brand-info { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.version-btn { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; border: 0; background: transparent; color: var(--ink-3); font-family: inherit; font-size: 10px; font-weight: 500; line-height: 1.1; letter-spacing: 0.02em; border-radius: 3px; }
+.version-btn:hover { color: var(--accent); }
+.version-btn svg { width: 10px; height: 10px; }
+.release-notes .dlg-head { margin-bottom: 6px; }
+.release-notes .dlg-head h2 { margin-bottom: 0; }
+.release-entry { padding: 18px 0; }
+.release-entry + .release-entry { border-top: 1px solid var(--border); }
+.release-entry:last-child { padding-bottom: 4px; }
+.release-entry h3 { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 5px; font-size: 14px; color: var(--ink-strong); }
+.release-current { padding: 3px 6px; border-radius: 5px; background: var(--fill-2); color: var(--accent); font-size: 10px; font-weight: 600; }
+.release-entry time { float: right; padding-top: 2px; color: var(--ink-3); font-size: 11px; }
+.release-entry .release-title { margin: 3px 0 9px; color: var(--ink-2); font-size: 12px; }
+.release-entry ul { margin: 0; padding-left: 17px; color: var(--ink-2); font-size: 12px; line-height: 1.6; }
+.release-entry li + li { margin-top: 4px; }

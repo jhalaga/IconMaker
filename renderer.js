@@ -355,11 +355,11 @@ var IM = (window.IM = window.IM || {});
 
   // Topmost path under (x,y) in paint order: higher layers and paths win, and
   // within one path the outline is painted over its own fill.
-  R.topHit = function (doc, x, y, tol) {
+  R.topHit = function (doc, x, y, tol, layerId) {
     var layers = doc.layers, i, j, L, p;
     for (i = layers.length - 1; i >= 0; i--) {
       L = layers[i];
-      if (!L.visible || L.locked) continue;
+      if (!L.visible || L.locked || (layerId && L.id !== layerId)) continue;
       for (j = L.paths.length - 1; j >= 0; j--) {
         p = L.paths[j];
         if (p.stroke && p.stroke.opacity > 0 && p.stroke.width > 0 && R.hitTestPoint(x, y, p, tol)) {
@@ -376,10 +376,10 @@ var IM = (window.IM = window.IM || {});
   // Topmost path a click lands on: an outline (any stroke width) or the inside
   // of a closed shape. The fill and outline tools use this, so they also work
   // on shapes that have no fill yet.
-  R.pickShape = function (doc, x, y, tol) {
+  R.pickShape = function (doc, x, y, tol, layerId) {
     for (var i = doc.layers.length - 1; i >= 0; i--) {
       var L = doc.layers[i];
-      if (!L.visible || L.locked) continue;
+      if (!L.visible || L.locked || (layerId && L.id !== layerId)) continue;
       for (var j = L.paths.length - 1; j >= 0; j--) {
         var p = L.paths[j];
         if (R.hitTestPoint(x, y, p, tol) || (p.closed && R.hitsPoint(p, x, y))) {

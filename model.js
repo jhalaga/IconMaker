@@ -430,9 +430,24 @@ var IM = (window.IM = window.IM || {});
     return op;
   };
 
+  // Each copy operation gets fresh path ids and its own independent groups.
+  function copyPaths(paths) {
+    var groups = Object.create(null);
+    return paths.map(function (path) {
+      var copy = clone(path);
+      copy.id = uid();
+      if (path.groupId) {
+        if (!groups[path.groupId]) groups[path.groupId] = uid();
+        copy.groupId = groups[path.groupId];
+      }
+      return copy;
+    });
+  }
+
   IM.Model = {
     uid: uid,
     clone: clone,
+    copyPaths: copyPaths,
     isColor: isColor,
     hexToRgb: hexToRgb,
     lighten: lighten,

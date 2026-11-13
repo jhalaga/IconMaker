@@ -852,12 +852,13 @@ test("new shapes: rectangle and oval default to no border; lines keep their thic
   app.state.shapeWidth = 3;
   down(app, "rect", 4, 4);
   up(app, "rect", 20, 16);
-  eq(lastPath(doc).stroke.width, 3, "a thickness the user chose is used");
+  eq(lastPath(doc).stroke.width, 0, "previous thickness does not carry over");
   app.state.shapeWidth = 0;
   app.state.fillKind = "none";
   down(app, "rect", 4, 4);
   up(app, "rect", 20, 16);
-  eq(lastPath(doc).stroke.width, 2, "an empty shape with no border would be invisible, so it gets the line thickness");
+  eq(lastPath(doc).stroke.width, 0, "new shapes reset to a solid fill without a border");
+  eq(lastPath(doc).fill.kind, "color");
 });
 
 test("select: dragging a multi-selection moves every selected shape and undoes as one step", () => {
@@ -962,12 +963,12 @@ test("eyedropper: copies the colour under the pointer into the target", () => {
   eq(picked, "#ab12cd");
 });
 
-test("eyedropper: with nothing selected, the toast says new shapes will use the colour", () => {
+test("eyedropper: with nothing selected, the toast explains how to apply the colour", () => {
   const a = basePath([M.pt(0, 0), M.pt(10, 0), M.pt(10, 10), M.pt(0, 10)], true);
   a.fill = { kind: "color", color: "#ab12cd", opacity: 1, gradient: null };
   const app = makeApp(docWith([a]));
   IM.Tools.eyedropper.onDown(app, { x: 5, y: 5, button: 0, space: false });
-  ok(app.toasts[0].indexOf("New shapes will use it") >= 0, "toast was: " + app.toasts[0]);
+  ok(app.toasts[0].indexOf("Use Fill or Outline") >= 0, "toast was: " + app.toasts[0]);
 });
 
 test("eyedropper: on the Fill target, an outline-only shape copies nothing and says why", () => {
@@ -1118,6 +1119,189 @@ test("sanitize keeps hole rings through a save and load", () => {
   const clean = IM.io.sanitize(JSON.parse(JSON.stringify(doc)));
   eq(clean.layers[0].paths[0].rings.length, 1, "hole ring preserved");
   near(mergeArea(clean.layers[0].paths[0]), 96, 0.5, "area unchanged after load");
+});
+
+/* ---------- selection, duplication and drawing regressions ---------- */
+
+function selectFrame(app, x0, y0, x1, y1, extra) {
+  IM.Tools.select.activate(app);
+  down(app, "select", x0, y0, extra);
+  move(app, "select", x1, y1, extra);
+  up(app, "select", x1, y1, extra);
+}
+
+test("marquee selects only fully enclosed shapes in either drag direction, including their border", () => {
+  const inside = rectPath(4, 4, 4, 4), partial = rectPath(12, 4, 8, 4);
+  const border = rectPath(4, 12, 4, 3);
+  border.stroke.width = 4;
+  const app = makeApp(docWith([inside, partial, border]));
+  selectFrame(app, 0, 0, 16, 16);
+  eq(app.state.selPathIds, [inside.id]);
+  app.select([], null);
+  selectFrame(app, 16, 16, 0, 0);
+  eq(app.state.selPathIds, [inside.id]);
+});
+
+test("marquee requires an entire group to fit and Shift preserves the previous selection", () => {
+  const a = rectPath(4, 4, 4, 4), b = rectPath(20, 4, 4, 4), c = rectPath(26, 4, 2, 2);
+  a.groupId = b.groupId = "originalGroup";
+  const app = makeApp(docWith([a, b, c]));
+  selectFrame(app, 0, 0, 16, 16);
+  eq(app.state.selPathIds, []);
+  app.select([c.id], c.id);
+  selectFrame(app, 0, 0, 25, 16, { shiftKey: true });
+  eq(app.state.selPathIds.slice().sort(), [a.id, b.id, c.id].sort());
+});
+
+test("copies preserve separate groups and get fresh group ids on every duplication or paste", () => {
+  const paths = [rectPath(1, 1, 2, 2), rectPath(4, 1, 2, 2), rectPath(7, 1, 2, 2), rectPath(10, 1, 2, 2)];
+  paths[0].groupId = paths[1].groupId = "firstGroup";
+  paths[2].groupId = "secondGroup";
+  const before = M.clone(paths), copies = M.copyPaths(paths), again = M.copyPaths(paths);
+  eq(paths, before, "originals remain unchanged");
+  eq(copies[0].groupId, copies[1].groupId);
+  ok(copies[0].groupId !== paths[0].groupId);
+  ok(copies[2].groupId !== copies[0].groupId);
+  ok(copies[0].groupId !== again[0].groupId);
+  ok(!copies[3].groupId, "ungrouped objects stay ungrouped");
+  copies.forEach((p, i) => ok(p.id !== paths[i].id));
+});
+
+test("Alt-drag duplicates a group independently and undo restores the original group", () => {
+  const a = rectPath(4, 4, 4, 4), b = rectPath(12, 4, 4, 4);
+  a.groupId = b.groupId = "sourceGroup";
+  a.fill.kind = b.fill.kind = "color";
+  const doc = docWith([a, b]), app = makeApp(doc);
+  app.select([a.id, b.id], a.id);
+  IM.Tools.select.activate(app);
+  down(app, "select", 6, 6, { altKey: true });
+  move(app, "select", 8, 8, { altKey: true });
+  up(app, "select", 8, 8, { altKey: true });
+  const copies = doc.layers[0].paths.slice(2);
+  eq(copies.length, 2);
+  eq(copies[0].groupId, copies[1].groupId);
+  ok(copies[0].groupId !== a.groupId);
+  app.history.undo();
+  eq(doc.layers[0].paths.map(p => p.groupId), ["sourceGroup", "sourceGroup"]);
+  app.history.redo();
+  eq(doc.layers[0].paths[2].groupId, copies[0].groupId);
+});
+
+test("canvas picking ignores other layers even when they overlap the active layer", () => {
+  const own = rectPath(4, 4, 8, 8), other = rectPath(4, 4, 8, 8);
+  own.fill.kind = other.fill.kind = "color";
+  const doc = docWith([own]), upper = M.makeLayer("Other");
+  upper.paths = [other]; doc.layers.push(upper);
+  eq(R.topHit(doc, 8, 8, 1, doc.activeLayerId).path.id, own.id);
+  eq(R.pickShape(doc, 8, 8, 1, doc.activeLayerId).path.id, own.id);
+  const app = makeApp(doc);
+  app.state.fillColor = "#ff0000";
+  click(app, "fill", 8, 8);
+  eq(own.fill.color, "#ff0000");
+  ok(other.fill.color !== "#ff0000");
+  click(app, "eraser", 8, 8);
+  eq(doc.layers[0].paths.length, 0);
+  eq(upper.paths.length, 1);
+  click(app, "node", 8, 8);
+  eq(app.state.selPathIds, []);
+  eq(doc.activeLayerId, doc.layers[0].id);
+  app.setActiveLayer(upper.id);
+  click(app, "node", 8, 8);
+  eq(app.state.selPathIds, [other.id]);
+});
+
+test("marquee skips locked and hidden active layers", () => {
+  const app = makeApp(docWith([rectPath(4, 4, 4, 4)]));
+  app.activeLayer().locked = true;
+  selectFrame(app, 0, 0, 16, 16);
+  eq(app.state.selPathIds, []);
+  app.activeLayer().locked = false; app.activeLayer().visible = false;
+  selectFrame(app, 0, 0, 16, 16);
+  eq(app.state.selPathIds, []);
+});
+
+test("every object tool creates editable geometry with default styling, despite previous style changes", () => {
+  for (const kind of [...Object.keys(IM.Tools.shapeNames), "line"]) {
+    const app = makeApp(docWith([]));
+    Object.assign(app.state, { fillKind: "gradient", fillColor: "#ff0000", fillOpacity: 0.2,
+      strokeColor: "#00ff00", strokeWidth: 9, shapeWidth: 7, strokeOpacity: 0.3, dash: "dot" });
+    IM.Tools[kind].activate?.(app);
+    down(app, kind, 24, 20);
+    move(app, kind, 4, 4);
+    const preview = M.clone(app.state.ghost);
+    up(app, kind, 4, 4);
+    const p = app.activeLayer().paths[0];
+    ok(p && p.points.length >= 2, kind);
+    eq(p.points, preview.points, kind + " preview matches result");
+    eq(p.closed, kind !== "line");
+    eq(p.fill, { kind: kind === "line" ? "none" : "color", color: "#000000", opacity: 1, gradient: null });
+    eq(p.stroke.color, "#000000"); eq(p.stroke.opacity, 1);
+    eq(p.stroke.width, kind === "line" ? 2 : 0); eq(p.dash, null);
+    ok(p.points.every(pt => Object.values(pt).every(Number.isFinite)));
+    app.history.undo(); eq(app.activeLayer().paths.length, 0);
+    app.history.redo(); eq(app.activeLayer().paths.length, 1);
+  }
+});
+
+test("Ctrl temporarily pans the view, restores the previous tool, and preserves Ctrl shortcuts", () => {
+  const sandbox = vm.createContext({ console, Math, JSON, Date, IM });
+  sandbox.window = sandbox;
+  sandbox.requestAnimationFrame = () => {};
+  sandbox.addEventListener = () => {};
+  sandbox.document = { readyState: "loading", addEventListener() {}, querySelector() { return null; } };
+  // Expose the real event handlers in this test context without booting a DOM.
+  const source = fs.readFileSync(path.join(ROOT, "main.js"), "utf8").replace(
+    '  if (document.readyState === "loading")',
+    '  app.testInput = { down: onKeyDown, up: onKeyUp, wire: wireCanvas };\n  if (document.readyState === "loading")');
+  vm.runInContext(source, sandbox, { filename: "main.js" });
+  const app = sandbox.IM.App, handlers = {}, classes = new Set();
+  app.canvas = { svg: {
+    addEventListener(name, handler) { handlers[name] = handler; },
+    setPointerCapture() {}, releasePointerCapture() {},
+    classList: {
+      add(...names) { names.forEach(n => classes.add(n)); },
+      toggle(name, on) { if (on) classes.add(name); else classes.delete(name); }
+    }
+  } };
+  app.doc = docWith([rectPath(2, 2, 4, 4)]);
+  app.state.tool = "rect";
+  app.testInput.wire();
+  const key = { key: "Control", ctrlKey: true, preventDefault() {} };
+  app.testInput.down(key);
+  ok(classes.has("space"));
+  handlers.pointerdown({ button: 0, pointerId: 1, ctrlKey: true, clientX: 10, clientY: 20, preventDefault() {} });
+  handlers.pointermove({ clientX: 35, clientY: 55 });
+  eq([app.view.panX, app.view.panY], [25, 35]);
+  ok(classes.has("grabbing"));
+  handlers.pointerup({ pointerId: 1 });
+  app.testInput.up({ key: "Control" });
+  ok(!classes.has("space") && !classes.has("grabbing"));
+  eq(app.state.tool, "rect");
+  eq(app.doc.layers[0].paths.length, 1, "panning does not draw an object");
+  let prevented = false;
+  let undid = false;
+  app.history = { undo() { undid = true; return false; } };
+  app.toast = () => {};
+  app.testInput.down({ key: "z", ctrlKey: true, preventDefault() { prevented = true; } });
+  ok(undid && prevented, "Ctrl+Z still works");
+});
+
+test("release history matches VERSION and the changelog, with valid versions and dates", () => {
+  vm.runInContext(fs.readFileSync(path.join(ROOT, "releases.js"), "utf8"), ctx, { filename: "releases.js" });
+  const releases = ctx.IM.Releases;
+  ok(releases.length > 0);
+  eq(fs.readFileSync(path.join(ROOT, "VERSION"), "utf8").trim(), releases[0].version);
+  const changelog = fs.readFileSync(path.join(ROOT, "CHANGELOG.md"), "utf8");
+  const seen = new Set();
+  releases.forEach((release, i) => {
+    ok(/^\d+\.\d+\.\d+$/.test(release.version));
+    ok(!seen.has(release.version)); seen.add(release.version);
+    eq(new Date(release.date).toISOString().slice(0, 10), release.date);
+    if (i) ok(release.date <= releases[i - 1].date, "newest releases first");
+    ok(changelog.includes(release.version + " — " + release.date));
+    ok(release.changes.length > 0);
+    release.changes.forEach(change => ok(changelog.includes(change)));
+  });
 });
 
 /* ---------- report ---------- */

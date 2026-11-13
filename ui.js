@@ -268,7 +268,7 @@
       app.toast("This layer is " + (L.locked ? "locked" : "hidden") + ". Choose another layer first.");
       return;
     }
-    var st = app.state, path = IM.Tools.newPathFromState(app, starterPoints(kind, app.doc.size), true, true);
+    var st = app.state, path = IM.Tools.newDrawingPath(app, starterPoints(kind, app.doc.size), true, true);
     path.fill = { kind: "color", color: st.fillKind === "none" ? "#000000" : st.fillColor, opacity: st.fillOpacity || 1, gradient: null };
     if (st.fillKind === "gradient") {
       path.fill.kind = "gradient";
@@ -293,7 +293,7 @@
   function closeMenu() {
     if (!openMenuEl) return;
     openMenuEl.classList.add("hidden");
-    var btn = openMenuEl.id === "more-menu" ? qs("#more-btn") : openMenuEl.id === APPEARANCE_ID ? qs("#theme-btn") : null;
+    var btn = openMenuEl.id === "more-menu" ? qs("#more-btn") : openMenuEl.id === APPEARANCE_ID ? qs("#theme-btn") : openMenuEl.id === "object-menu" ? qs("#add-object") : null;
     if (btn) btn.setAttribute("aria-expanded", "false");
     openMenuEl = null;
     if (menuReturnFocus && menuReturnFocus.isConnected) menuReturnFocus.focus();
@@ -368,9 +368,8 @@
 
   function openContextMenu(clientX, clientY) {
     var p = docPoint(clientX, clientY);
-    var hit = R.topHit(app.doc, p.x, p.y, 8 / app.view.zoom);
+    var hit = R.topHit(app.doc, p.x, p.y, 8 / app.view.zoom, app.doc.activeLayerId);
     if (hit && app.state.selPathIds.indexOf(hit.path.id) < 0) {
-      if (hit.layerId !== app.doc.activeLayerId) app.setActiveLayer(hit.layerId);
       app.select(app.expandGroups([hit.path.id]), hit.path.id);
       app.renderAll();
     }
@@ -728,7 +727,7 @@
     var key = app.state.tool + "|" + app.state.selPathIds.join(",") + "|" + (bb ? [bb.x, bb.y, bb.w, bb.h].map(round1).join(",") : "");
     if (key !== lastSelKey) {
       lastSelKey = key;
-      if (!n) summary.textContent = "Nothing selected. These settings apply to new shapes.";
+      if (!n) summary.textContent = "Select an object to style it, or use Fill and Outline.";
       else {
         var what = units.length === 1 && n > 1 ? "A group of " + n + " shapes" : n === 1 ? "1 shape" : n + " shapes";
         summary.innerHTML = "";
@@ -898,6 +897,40 @@
     if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: "nearest" });
   }
 
+  function wireObjectMenu() {
+    var btn = qs("#add-object"), menu = qs("#object-menu");
+    btn.addEventListener("click", function () {
+      if (openMenuEl === menu) { closeMenu(); return; }
+      closeMenu();
+      var items = Object.keys(IM.Tools.shapeNames).map(function (kind) {
+        return {
+          label: IM.Tools.shapeNames[kind],
+          kbd: kind === "rect" ? "R" : kind === "ellipse" ? "E" : "",
+          run: function () { app.setTool(kind); app.canvas.svg.focus(); }
+        };
+      });
+      fillMenu(menu, items);
+      // Use the same editable geometry as the drawing tools for menu icons.
+      qsa("button", menu).forEach(function (item, i) {
+        var kind = Object.keys(IM.Tools.shapeNames)[i];
+        var geometry = IM.Tools.shapeGeom(kind, 3, 3, 21, 21, false, false, 32);
+        var path = M.makePath(true);
+        path.points = geometry.points;
+        var icon = document.createElementNS(NS, "svg");
+        icon.setAttribute("viewBox", "0 0 24 24");
+        icon.setAttribute("aria-hidden", "true");
+        var outline = document.createElementNS(NS, "path");
+        outline.setAttribute("d", R.pathD(path));
+        icon.appendChild(outline);
+        item.insertBefore(icon, item.firstChild);
+      });
+      var r = btn.getBoundingClientRect();
+      menuReturnFocus = btn;
+      btn.setAttribute("aria-expanded", "true");
+      placeMenu(menu, r.right + 8, Math.min(r.top, window.innerHeight - menu.scrollHeight - 8));
+    });
+  }
+
   /* ---------- tool bar keyboard navigation ---------- */
 
   function syncToolTabs() {
@@ -927,12 +960,12 @@
   function wireHover() {
     var svg = app.canvas.svg;
     svg.addEventListener("pointermove", function (ev) {
-      if (ev.pointerType !== "mouse" || ev.buttons || app.state.tool !== "select" || app.state.space) {
+      if (ev.pointerType !== "mouse" || ev.buttons || app.state.tool !== "select" || app.state.space || app.state.ctrl) {
         if (app.state.hoverId && ev.buttons) { app.state.hoverId = null; }
         return;
       }
       var p = docPoint(ev.clientX, ev.clientY);
-      var hit = R.topHit(app.doc, p.x, p.y, 8 / app.view.zoom);
+      var hit = R.topHit(app.doc, p.x, p.y, 8 / app.view.zoom, app.doc.activeLayerId);
       var id = hit ? hit.path.id : null;
       if (id !== app.state.hoverId) {
         app.state.hoverId = id;
@@ -949,9 +982,12 @@
   function commands() {
     var list = [];
     function add(group, label, run, kbd, words) { list.push({ group: group, label: label, run: run, kbd: kbd || "", words: words || "" }); }
-    qsa("#tools .tool").forEach(function (b) {
+    qsa("#tools .tool[data-tool]").forEach(function (b) {
       var t = b.getAttribute("data-tool"), k = b.getAttribute("aria-keyshortcuts");
       add("Tool", b.getAttribute("aria-label"), function () { app.setTool(t); }, k, "tool draw " + t);
+    });
+    Object.keys(IM.Tools.shapeNames).forEach(function (kind) {
+      add("Tool", "Draw " + IM.Tools.shapeNames[kind], function () { app.setTool(kind); }, kind === "rect" ? "R" : kind === "ellipse" ? "E" : "", "object shape draw " + kind);
     });
     add("File", "New icon", app.newIcon, "", "clear start blank");
     add("File", "Open a saved icon…", app.openProject, "Ctrl+O", "load");
@@ -1098,6 +1134,37 @@
     });
   }
 
+  /* ---------- version and release notes ---------- */
+
+  function wireReleaseNotes() {
+    var button = qs("#release-notes-btn"), dialog = qs("#release-notes-dlg");
+    var current = IM.Releases[0];
+    qs("#app-version").textContent = "v" + current.version;
+    button.setAttribute("aria-label", "Version " + current.version + ". Open release notes");
+    IM.Releases.forEach(function (release, i) {
+      var section = mk("section", "release-entry");
+      var heading = mk("h3", null, "v" + release.version);
+      if (i === 0) heading.appendChild(mk("span", "release-current", "Latest"));
+      var date = mk("time", null, new Intl.DateTimeFormat("en", {
+        day: "numeric", month: "short", year: "numeric", timeZone: "UTC"
+      }).format(new Date(release.date + "T00:00:00Z")));
+      date.dateTime = release.date;
+      section.appendChild(heading);
+      section.appendChild(date);
+      section.appendChild(mk("p", "release-title", release.title));
+      var list = mk("ul");
+      release.changes.forEach(function (change) { list.appendChild(mk("li", null, change)); });
+      section.appendChild(list);
+      qs("#release-notes-list").appendChild(section);
+    });
+    button.addEventListener("click", function () { closeMenu(); dialog.showModal(); });
+    qs("#release-notes-close").addEventListener("click", function () { dialog.close(); });
+    dialog.addEventListener("click", function (ev) {
+      var r = dialog.getBoundingClientRect();
+      if (ev.target === dialog && (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom)) dialog.close();
+    });
+  }
+
   /* ---------- small settings ---------- */
 
   function wireSettings() {
@@ -1142,6 +1209,8 @@
     refreshHistory();
   });
 
+  wireReleaseNotes();
+  wireObjectMenu();
   wireSettings();
   wireMoreMenu();
   wireDrawer();

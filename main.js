@@ -42,6 +42,7 @@
       snap: true,
       grid: true,
       space: false,
+      ctrl: false,
       selPathId: null,
       selPathIds: [],
       selPointIndex: -1,
@@ -112,7 +113,7 @@
 
   /* ---------- selection ---------- */
 
-  // Style controls show the selected shape's style; new shapes copy it.
+  // Style controls show the selected shape's style for editing and painting.
   function syncStateFromSelection() {
     var p = primaryPath();
     if (!p) return;
@@ -154,6 +155,7 @@
   function setActiveLayer(id) {
     if (!M.layer(app.doc, id) || app.doc.activeLayerId === id) return;
     app.doc.activeLayerId = id;
+    app.state.hoverId = null;
     select([], null);
   }
 
@@ -458,7 +460,7 @@
     app.state.tool = name;
     app.state.selPointIndex = -1;
     qsa("#tools .tool").forEach(function (btn) {
-      var on = btn.getAttribute("data-tool") === name;
+      var on = btn.id === "add-object" ? !!IM.Tools.shapeNames[name] : btn.getAttribute("data-tool") === name;
       btn.classList.toggle("sel", on);
       btn.setAttribute("aria-pressed", on ? "true" : "false");
     });
@@ -571,8 +573,9 @@
         }
         if (pinch) return;
       }
-      if (app.state.space || ev.button === 1) {
+      if (app.state.space || app.state.ctrl || ev.ctrlKey || ev.button === 1) {
         panning = true;
+        svg.classList.add("space", "grabbing");
         panLast = { x: ev.clientX, y: ev.clientY };
         ev.preventDefault();
         return;
@@ -620,6 +623,7 @@
       if (panning) {
         panning = false;
         panLast = null;
+        updatePanCursor();
         return;
       }
       if (!dragging) return;
@@ -718,9 +722,9 @@
       return ids;
     }
     beginTx();
-    for (var i = 0; i < list.length; i++) {
-      var q = M.clone(list[i]);
-      q.id = M.uid();
+    var copies = M.copyPaths(list);
+    for (var i = 0; i < copies.length; i++) {
+      var q = copies[i];
       M.movePath(q, 2, 2);
       pushHistory("Paste", { type: "add", layerId: L.id, path: q });
       ids.push(q.id);
@@ -890,12 +894,18 @@
     if (qs("dialog[open]")) return;
     var k = ev.key;
 
+    if (k === "Control") {
+      app.state.ctrl = true;
+      updatePanCursor();
+      return;
+    }
+
     if (k === " ") {
       ev.preventDefault();
       if (ev.target && ev.target.tagName === "BUTTON") ev.target.blur();
       if (!app.state.space) {
         app.state.space = true;
-        app.canvas.svg.classList.add("space");
+        updatePanCursor();
       }
       return;
     }
@@ -962,11 +972,15 @@
     if (k === "}" || k === "{") { moveSelectionToLayer(k === "}" ? 1 : -1); return; }
   }
 
+  function updatePanCursor() {
+    app.canvas.svg.classList.toggle("space", app.state.space || app.state.ctrl || panning);
+    app.canvas.svg.classList.toggle("grabbing", panning);
+  }
+
   function onKeyUp(ev) {
-    if (ev.key === " ") {
-      app.state.space = false;
-      app.canvas.svg.classList.remove("space");
-    }
+    if (ev.key === " ") app.state.space = false;
+    if (ev.key === "Control") app.state.ctrl = false;
+    updatePanCursor();
   }
 
   /* ---------- layers panel ---------- */
@@ -1334,7 +1348,7 @@
     var p = primaryPath();
     if (p) return p.closed;
     var t = app.state.tool;
-    return t === "rect" || t === "ellipse";
+    return !!IM.Tools.shapeNames[t];
   }
 
   // The thickness shown in the panel: the selected shape's, else the default
@@ -1531,7 +1545,7 @@
   }
 
   function wireToolbar() {
-    qsa("#tools .tool").forEach(function (btn) {
+    qsa("#tools .tool[data-tool]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         setTool(btn.getAttribute("data-tool"));
         if (btn.blur && btn.isConnected) btn.blur();
@@ -1785,6 +1799,13 @@
     wireTooltips();
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", function () {
+      app.state.space = false;
+      app.state.ctrl = false;
+      panning = false;
+      panLast = null;
+      updatePanCursor();
+    });
     window.addEventListener("resize", onResize);
 
     app.state.hints = loadHintsPref();

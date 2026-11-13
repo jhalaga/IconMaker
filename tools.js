@@ -50,12 +50,12 @@ var IM = (window.IM = window.IM || {});
 
   // Visible shape under the pointer, in paint order (see R.topHit).
   function hitAt(app, x, y) {
-    return R.topHit(app.doc, x, y, tolOf(app));
+    return R.topHit(app.doc, x, y, tolOf(app), app.doc.activeLayerId);
   }
 
   // Shape under the pointer for the fill and outline tools (outline or inside).
   function pickAt(app, x, y) {
-    return R.pickShape(app.doc, x, y, tolOf(app));
+    return R.pickShape(app.doc, x, y, tolOf(app), app.doc.activeLayerId);
   }
 
   // Null when a Fill pick finds no fill, so an outline colour is never copied as a fill.
@@ -77,23 +77,13 @@ var IM = (window.IM = window.IM || {});
     };
   }
 
-  // A new path that takes its look from the current tool settings.
-  // isShape (rectangle, oval) uses its own default border thickness, 0 unless
-  // the user chose one; lines and pen/pencil paths use the line thickness.
-  function newPathFromState(app, points, closed, isShape) {
-    var st = app.state;
+  // Drawing always starts with the default style, independent of the last edit.
+  function newDrawingPath(app, points, closed, isShape) {
     var path = M.makePath(closed);
     path.points = points;
-    path.fill = { kind: "none", color: st.fillColor, opacity: st.fillOpacity, gradient: null };
-    if (closed && st.fillKind !== "none") {
-      path.fill.kind = st.fillKind;
-      if (st.fillKind === "gradient") path.fill.gradient = gradientFor(path, st.gradient.stops);
-    }
-    var width = isShape ? st.shapeWidth : st.strokeWidth;
-    // never make an invisible shape: no area and no border
-    if (isShape && !(width > 0) && path.fill.kind === "none") width = st.strokeWidth > 0 ? st.strokeWidth : 2;
-    path.stroke = { color: st.strokeColor, width: width, opacity: st.strokeOpacity, cap: "round", join: "round" };
-    path.dash = st.dash && st.dash !== "none" ? { pattern: st.dash } : null;
+    path.fill = { kind: closed ? "color" : "none", color: "#000000", opacity: 1, gradient: null };
+    path.stroke = { color: "#000000", width: isShape ? 0 : 2, opacity: 1, cap: "round", join: "round" };
+    path.dash = null;
     return path;
   }
 
@@ -193,9 +183,9 @@ var IM = (window.IM = window.IM || {});
     for (var i = 0; i < L.paths.length; i++) {
       if (ids.indexOf(L.paths[i].id) >= 0) paths.push(L.paths[i]);
     }
-    for (var j = 0; j < paths.length; j++) {
-      var copy = M.clone(paths[j]);
-      copy.id = M.uid();
+    var copies = M.copyPaths(paths);
+    for (var j = 0; j < copies.length; j++) {
+      var copy = copies[j];
       app.pushHistory("Duplicate", { type: "add", layerId: L.id, path: copy });
       newIds.push(copy.id);
     }
@@ -209,7 +199,7 @@ var IM = (window.IM = window.IM || {});
       if (app.state.selPathIds.length) {
         return "Drag to move. Drag a corner to resize, the top circle to rotate. Arrow keys nudge. Del deletes.";
       }
-      return "Click a shape to select it. Drag on empty space to select several. Shift adds to the selection.";
+      return "Click a shape on the active layer to select it. Drag to fully enclose shapes or groups. Shift adds to the selection.";
     },
     activate: function () { drag = null; marquee = null; },
     deactivate: function (app) {
@@ -256,7 +246,6 @@ var IM = (window.IM = window.IM || {});
 
       var hit = hitAt(app, e.x, e.y);
       if (hit) {
-        if (hit.layerId !== app.doc.activeLayerId) app.setActiveLayer(hit.layerId);
         var id = hit.path.id;
         var ids = app.state.selPathIds.slice();
         if (e.shiftKey) {
@@ -337,16 +326,21 @@ var IM = (window.IM = window.IM || {});
         var x0 = Math.min(m.x0, m.x1), x1 = Math.max(m.x0, m.x1);
         var y0 = Math.min(m.y0, m.y1), y1 = Math.max(m.y0, m.y1);
         var L = app.activeLayer(), ids = m.add ? m.base.slice() : [];
-        if (L) {
-          for (var i = 0; i < L.paths.length; i++) {
-            var b = R.bbox(L.paths[i], false);
-            if (!b) continue;
-            if (b.x <= x1 && b.x + b.w >= x0 && b.y <= y1 && b.y + b.h >= y0) {
-              if (ids.indexOf(L.paths[i].id) < 0) ids.push(L.paths[i].id);
-            }
-          }
+        if (L && L.visible && !L.locked) {
+          var contained = L.paths.filter(function (path) {
+            var b = R.bbox(path, true);
+            return b && b.x >= x0 && b.x + b.w <= x1 && b.y >= y0 && b.y + b.h <= y1;
+          }).map(function (path) { return path.id; });
+          L.paths.forEach(function (path) {
+            if (contained.indexOf(path.id) < 0) return;
+            // A group is one selectable object: every member must fit.
+            if (path.groupId && L.paths.some(function (member) {
+              return member.groupId === path.groupId && contained.indexOf(member.id) < 0;
+            })) return;
+            if (ids.indexOf(path.id) < 0) ids.push(path.id);
+          });
         }
-        app.select(app.expandGroups(ids), ids[ids.length - 1] || null);
+        app.select(ids, ids[ids.length - 1] || null);
         app.renderAll();
         return;
       }
@@ -390,7 +384,7 @@ var IM = (window.IM = window.IM || {});
 
   function updateGhost(app) {
     var d = app.state.penDraft;
-    app.state.ghost = d && d.points.length >= 2 ? newPathFromState(app, M.clone(d.points), false) : null;
+    app.state.ghost = d && d.points.length >= 2 ? newDrawingPath(app, M.clone(d.points), false) : null;
   }
 
   function cancelDraft(app) {
@@ -417,7 +411,7 @@ var IM = (window.IM = window.IM || {});
         });
       }
     } else if (pts.length >= (closed ? 3 : 2)) {
-      addPath(app, newPathFromState(app, pts, !!closed));
+      addPath(app, newDrawingPath(app, pts, !!closed));
     }
     app.renderAll();
   }
@@ -582,7 +576,7 @@ var IM = (window.IM = window.IM || {});
       simp[i].cLx = h.cLx; simp[i].cLy = h.cLy;
       simp[i].cRx = h.cRx; simp[i].cRy = h.cRy;
     }
-    addPath(app, newPathFromState(app, simp, closed));
+    addPath(app, newDrawingPath(app, simp, closed));
     app.renderAll();
   }
 
@@ -596,12 +590,12 @@ var IM = (window.IM = window.IM || {});
       if (e.space || e.button) return;
       if (!activeUnlocked(app)) return;
       pencilPts = [M.pt(e.x, e.y)];
-      app.state.ghost = newPathFromState(app, M.clone(pencilPts), false);
+      app.state.ghost = newDrawingPath(app, M.clone(pencilPts), false);
       app.requestRender();
     },
     onMove: function (app, e) {
       if (!pencilPts || !addPencilPoint(app, e)) return;
-      app.state.ghost = newPathFromState(app, M.clone(pencilPts), false);
+      app.state.ghost = newDrawingPath(app, M.clone(pencilPts), false);
       app.requestRender();
     },
     onUp: function (app, e) {
@@ -644,7 +638,7 @@ var IM = (window.IM = window.IM || {});
       if (!lineD) return;
       var end = lineEnd(app, lineD, e);
       lineD.x1 = end.x; lineD.y1 = end.y;
-      app.state.ghost = newPathFromState(app, [M.pt(lineD.x0, lineD.y0), M.pt(end.x, end.y)], false);
+      app.state.ghost = newDrawingPath(app, [M.pt(lineD.x0, lineD.y0), M.pt(end.x, end.y)], false);
       app.requestRender();
     },
     onUp: function (app, e) {
@@ -655,7 +649,7 @@ var IM = (window.IM = window.IM || {});
       var end = lineEnd(app, d, e);
       d.x1 = end.x; d.y1 = end.y;
       if (dist(d.x0, d.y0, d.x1, d.y1) >= MIN_DIST) {
-        addPath(app, newPathFromState(app, [M.pt(d.x0, d.y0), M.pt(d.x1, d.y1)], false));
+        addPath(app, newDrawingPath(app, [M.pt(d.x0, d.y0), M.pt(d.x1, d.y1)], false));
       }
       app.renderAll();
     },
@@ -663,7 +657,13 @@ var IM = (window.IM = window.IM || {});
     onKey: function () { return false; }
   };
 
-  /* ---------- rectangle and ellipse ---------- */
+  /* ---------- drawable objects ---------- */
+
+  var shapeNames = {
+    rect: "Rectangle", roundedRect: "Rounded rectangle", ellipse: "Oval",
+    triangle: "Triangle", diamond: "Diamond", pentagon: "Pentagon", hexagon: "Hexagon",
+    star: "Star", heart: "Heart", arrow: "Arrow", plus: "Plus"
+  };
 
   // Geometry for a rectangle or ellipse dragged from (x0,y0) to (x1,y1).
   function shapeGeom(kind, x0, y0, x1, y1, shift, alt, size) {
@@ -673,8 +673,8 @@ var IM = (window.IM = window.IM || {});
       y1 = y0 + (dy < 0 ? -m : m);
     }
     var ax = Math.min(x0, x1), bx = Math.max(x0, x1), ay = Math.min(y0, y1), by = Math.max(y0, y1);
-    if (kind === "rect") {
-      if (alt && bx - ax > 0 && by - ay > 0) {
+    if (kind === "rect" || kind === "roundedRect") {
+      if ((alt || kind === "roundedRect") && bx - ax > 0 && by - ay > 0) {
         // rounded corners; radius scales with the artboard (2 px at 32 px)
         var r = Math.min(Math.max(1, size / 16), (bx - ax) / 2, (by - ay) / 2);
         var k = 0.5523 * r;
@@ -693,6 +693,34 @@ var IM = (window.IM = window.IM || {});
         };
       }
       return { closed: true, points: [M.pt(ax, ay), M.pt(bx, ay), M.pt(bx, by), M.pt(ax, by)] };
+    }
+    var w = bx - ax, h = by - ay, vertices = null;
+    if (kind === "triangle") vertices = [[0.5, 0], [1, 1], [0, 1]];
+    if (kind === "diamond") vertices = [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]];
+    if (kind === "arrow") vertices = [[0, 0.3], [0.6, 0.3], [0.6, 0], [1, 0.5], [0.6, 1], [0.6, 0.7], [0, 0.7]];
+    if (kind === "plus") vertices = [[0.35, 0], [0.65, 0], [0.65, 0.35], [1, 0.35], [1, 0.65], [0.65, 0.65], [0.65, 1], [0.35, 1], [0.35, 0.65], [0, 0.65], [0, 0.35], [0.35, 0.35]];
+    if (kind === "pentagon" || kind === "hexagon" || kind === "star") {
+      vertices = [];
+      var n = kind === "star" ? 10 : kind === "pentagon" ? 5 : 6;
+      for (var i = 0; i < n; i++) {
+        var angle = -Math.PI / 2 + i * Math.PI * 2 / n;
+        var radius = kind === "star" && i % 2 ? 0.225 : 0.5;
+        vertices.push([0.5 + radius * Math.cos(angle), 0.5 + radius * Math.sin(angle)]);
+      }
+      // Fit the polygon exactly to the dragged frame.
+      var xs = vertices.map(function (v) { return v[0]; }), ys = vertices.map(function (v) { return v[1]; });
+      var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+      var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+      vertices = vertices.map(function (v) { return [(v[0] - minX) / (maxX - minX), (v[1] - minY) / (maxY - minY)]; });
+    }
+    if (vertices) return { closed: true, points: vertices.map(function (v) { return M.pt(ax + v[0] * w, ay + v[1] * h); }) };
+    if (kind === "heart") {
+      return { closed: true, points: [
+        M.pt(ax + w * 0.5, by, w * 0.25, -h * 0.25, -w * 0.25, -h * 0.25),
+        M.pt(ax, ay + h * 0.3, 0, h * 0.25, 0, -h * 0.4),
+        M.pt(ax + w * 0.5, ay + h * 0.2, -w * 0.2, -h * 0.3, w * 0.2, -h * 0.3),
+        M.pt(bx, ay + h * 0.3, 0, -h * 0.4, 0, h * 0.25)
+      ] };
     }
     var cx = (ax + bx) / 2, cy = (ay + by) / 2, rx = (bx - ax) / 2, ry = (by - ay) / 2;
     var kx = 0.5523 * rx, ky = 0.5523 * ry;
@@ -715,7 +743,8 @@ var IM = (window.IM = window.IM || {});
       hint: function () {
         return kind === "rect"
           ? "Drag to draw a rectangle. Hold Shift for a square, Alt for rounded corners."
-          : "Drag to draw an oval. Hold Shift for a circle.";
+          : kind === "ellipse" ? "Drag to draw an oval. Hold Shift for a circle."
+          : "Drag to draw a " + shapeNames[kind].toLowerCase() + ". Hold Shift for equal width and height.";
       },
       activate: function () { s = null; },
       deactivate: function (app) { s = null; app.state.ghost = null; },
@@ -730,7 +759,7 @@ var IM = (window.IM = window.IM || {});
         var p = snapPt(app, e.x, e.y, []);
         s.x1 = p.x; s.y1 = p.y;
         var g = shapeGeom(kind, s.x0, s.y0, s.x1, s.y1, e.shiftKey, e.altKey, app.doc.size);
-        app.state.ghost = newPathFromState(app, g.points, g.closed, true);
+        app.state.ghost = newDrawingPath(app, g.points, g.closed, true);
         app.requestRender();
       },
       onUp: function (app, e) {
@@ -744,7 +773,7 @@ var IM = (window.IM = window.IM || {});
         var xs = g.points.map(function (q) { return q.x; }), ys = g.points.map(function (q) { return q.y; });
         var w = Math.max.apply(null, xs) - Math.min.apply(null, xs);
         var h = Math.max.apply(null, ys) - Math.min.apply(null, ys);
-        if (w >= MIN_SHAPE && h >= MIN_SHAPE) addPath(app, newPathFromState(app, g.points, g.closed, true));
+        if (w >= MIN_SHAPE && h >= MIN_SHAPE) addPath(app, newDrawingPath(app, g.points, g.closed, true));
         app.renderAll();
       },
       onDblClick: function () {},
@@ -843,7 +872,7 @@ var IM = (window.IM = window.IM || {});
       var hasSelection = app.state.selPathIds.length > 0;
       if (app.state.styleTarget === "fill") app.setFillColor(c);
       else app.setStrokeColor(c);
-      app.toast(hasSelection ? "Picked " + c : "Picked " + c + ". New shapes will use it.");
+      app.toast(hasSelection ? "Picked " + c : "Picked " + c + ". Use Fill or Outline to apply it.");
     },
     onMove: function () {},
     onUp: function () {}
@@ -997,7 +1026,6 @@ var IM = (window.IM = window.IM || {});
       if (!hn) {
         var hit = hitAt(app, e.x, e.y);
         if (hit) {
-          if (hit.layerId !== app.doc.activeLayerId) app.setActiveLayer(hit.layerId);
           app.select([hit.path.id], hit.path.id);
         } else {
           app.select([], null);
@@ -1162,7 +1190,7 @@ var IM = (window.IM = window.IM || {});
   var hand = {
     id: "hand",
     cursor: "grab",
-    hint: function () { return "Drag to move around the artboard. You can also hold Space in any tool."; },
+    hint: function () { return "Drag to move around the artboard. You can also hold Ctrl or Space in any tool."; },
     deactivate: function () { handD = null; },
     onDown: function (app, e) {
       if (e.button) return;
@@ -1199,7 +1227,11 @@ var IM = (window.IM = window.IM || {});
     },
     // helpers shared with the app shell
     gradientFor: gradientFor,
-    newPathFromState: newPathFromState,
+    newDrawingPath: newDrawingPath,
+    shapeNames: shapeNames,
     shapeGeom: shapeGeom
   };
+  Object.keys(shapeNames).forEach(function (kind) {
+    if (!IM.Tools[kind]) IM.Tools[kind] = shapeTool(kind);
+  });
 })();

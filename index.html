@@ -22,7 +22,7 @@
 <a class="skip-link" href="#canvas">Skip to the drawing area</a>
 
 <header id="topbar" class="glass-card">
-  <span class="brand"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><path d="M8 15.5 12 7.5l4 8" /><path d="M9.5 12.5h5" /></svg>IconMaker</span>
+  <span class="brand"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><path d="M8 15.5 12 7.5l4 8" /><path d="M9.5 12.5h5" /></svg><span class="brand-info"><span>IconMaker</span><button id="release-notes-btn" class="version-btn" type="button" aria-label="Release notes" aria-haspopup="dialog" aria-controls="release-notes-dlg" data-tip="What’s new in IconMaker"><span id="app-version"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" /></svg></button></span></span>
   <div class="tb-sep wide-only"></div>
   <div class="tb-group wide-only" id="size-group" role="group" aria-label="Icon size">
     <button class="chip" data-size="16" aria-pressed="false" data-tip="16 Ã— 16 pixels (key 1)">16</button>
@@ -76,15 +76,14 @@
   <button class="tool" data-tool="pen" aria-label="Pen: points and curves" aria-keyshortcuts="P" aria-pressed="false" data-tip="Pen: points and curves (P). Drag a point to bend it"><svg viewBox="0 0 24 24"><path d="M15.71 21.29a1 1 0 0 1-1.42 0l-1.58-1.58a1 1 0 0 1 0-1.42l5.58-5.58a1 1 0 0 1 1.42 0l1.58 1.58a1 1 0 0 1 0 1.42z" /><path d="m18 13-1.38-6.87a1 1 0 0 0-.74-.78L3.24 2.03a1 1 0 0 0-1.21 1.2l3.32 12.65a1 1 0 0 0 .78.74L13 18" /><path d="m2.3 2.3 7.29 7.29" /><circle cx="11" cy="11" r="2" /></svg><kbd>P</kbd></button>
   <button class="tool fillable" data-tool="pencil" aria-label="Pencil: freehand" aria-keyshortcuts="B" aria-pressed="false" data-tip="Pencil: draw freely (B)"><svg viewBox="0 0 24 24"><path d="M21.17 6.81a2.82 2.82 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z" /><path d="m15 5 4 4" /></svg><kbd>B</kbd></button>
   <button class="tool" data-tool="line" aria-label="Line" aria-keyshortcuts="L" aria-pressed="false" data-tip="Line (L). Shift snaps the angle"><svg viewBox="0 0 24 24"><path d="M6.5 17.5 17.5 6.5" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="5" r="2" /></svg><kbd>L</kbd></button>
-  <button class="tool fillable" data-tool="rect" aria-label="Rectangle" aria-keyshortcuts="R" aria-pressed="false" data-tip="Rectangle (R). Shift = square, Alt = rounded"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" /></svg><kbd>R</kbd></button>
-  <button class="tool fillable" data-tool="ellipse" aria-label="Oval" aria-keyshortcuts="E" aria-pressed="false" data-tip="Oval (E). Shift = circle"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /></svg><kbd>E</kbd></button>
+  <button id="add-object" class="tool fillable" aria-label="Add object" aria-haspopup="menu" aria-expanded="false" aria-controls="object-menu" aria-pressed="false" data-tip="Add object: choose a shape, then drag to draw"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="11" height="11" rx="2" /><circle cx="16" cy="16" r="5" /><path d="m17 3 2 2 2-2" /></svg></button>
   <div class="tool-sep" aria-hidden="true"></div>
   <button class="tool fillable" data-tool="fill" aria-label="Fill colour" aria-keyshortcuts="G" aria-pressed="false" data-tip="Fill (G): click inside a shape to give it the area colour"><svg viewBox="0 0 24 24"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0z" /><path d="m5 2 5 5" /><path d="M2 13h15" /><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4" /></svg><kbd>G</kbd></button>
   <button class="tool" data-tool="stroke" aria-label="Outline style" aria-keyshortcuts="K" aria-pressed="false" data-tip="Outline (K): click a shape's edge to give it the border style"><svg viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="2.5" stroke-width="3.2" /></svg><kbd>K</kbd></button>
   <button class="tool" data-tool="node" aria-label="Edit points" aria-keyshortcuts="T" aria-pressed="false" data-tip="Edit points and curves (T)"><svg viewBox="0 0 24 24"><path d="M5 18C5 11 11 6 18 6" /><rect x="2.5" y="17" width="5" height="5" rx="1" /><rect x="16.5" y="3.5" width="5" height="5" rx="1" /><path d="M5 17V11" /><circle cx="5" cy="9.5" r="1.5" /></svg><kbd>T</kbd></button>
   <button class="tool fillable" data-tool="eraser" aria-label="Eraser" aria-keyshortcuts="C" aria-pressed="false" data-tip="Eraser (C): click or drag over shapes"><svg viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21z" /><path d="M22 21H7" /><path d="m5 11 9 9" /></svg><kbd>C</kbd></button>
   <button class="tool" data-tool="eyedropper" aria-label="Pick a colour" aria-keyshortcuts="I" aria-pressed="false" data-tip="Pick a colour (I)"><svg viewBox="0 0 24 24"><path d="m2 22 1-1h3l9-9" /><path d="M3 21v-3l9-9" /><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4z" /></svg><kbd>I</kbd></button>
-  <button class="tool fillable" data-tool="hand" aria-label="Move the view" aria-keyshortcuts="H" aria-pressed="false" data-tip="Move the view (H, or hold Space)"><svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></svg><kbd>H</kbd></button>
+  <button class="tool fillable" data-tool="hand" aria-label="Move the view" aria-keyshortcuts="H" aria-pressed="false" data-tip="Move the view (H, or hold Ctrl / Space)"><svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0" /><path d="M14 10V4a2 2 0 0 0-4 0v2" /><path d="M10 10.5V6a2 2 0 0 0-4 0v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></svg><kbd>H</kbd></button>
 </nav>
 
 <main id="canvas-wrap">
@@ -154,7 +153,7 @@
   </div>
 
   <div id="panel-style" class="panel-body" role="tabpanel" aria-labelledby="tab-style">
-    <p id="sel-summary" class="sel-summary" aria-live="polite">Nothing selected. These settings apply to new shapes.</p>
+    <p id="sel-summary" class="sel-summary" aria-live="polite">Select an object to style it, or use Fill and Outline.</p>
 
     <section id="sec-transform" class="style-sec sel-only" aria-labelledby="sec-transform-title">
       <h3 id="sec-transform-title" class="sec-title">Position and size</h3>
@@ -257,6 +256,7 @@
 <div id="toast" role="status" aria-live="polite"><svg class="toast-ok" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span id="toast-text"></span></div>
 <div id="sr-status" class="sr-only" role="status" aria-live="polite"></div>
 
+<div id="object-menu" class="menu object-menu glass-card hidden" role="menu" aria-label="Add object"></div>
 <div id="ctx-menu" class="menu glass-card hidden" role="menu" aria-label="Shape actions"></div>
 
 <div id="appearance" class="menu appearance glass-card hidden" role="dialog" aria-label="Appearance">
@@ -357,6 +357,16 @@
   </div>
 </dialog>
 
+<dialog id="release-notes-dlg" class="dlg dlg-small release-notes" aria-labelledby="release-notes-title">
+  <div class="dlg-inner">
+    <div class="dlg-head">
+      <h2 id="release-notes-title">What’s new</h2>
+      <button id="release-notes-close" type="button" class="icon-btn" aria-label="Close release notes" autofocus><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+    </div>
+    <div id="release-notes-list"></div>
+  </div>
+</dialog>
+
 <dialog id="help" class="dlg" aria-labelledby="help-title">
   <div class="help-inner">
     <div class="dlg-head">
@@ -365,24 +375,24 @@
     </div>
     <h3>How each tool works</h3>
     <dl class="help-tools">
-      <dt>Select (V)</dt><dd>Click a shape to select it. Drag on empty space to select several; Shift adds to the selection. Drag to move, drag a corner to resize, drag the top circle to rotate. Right-click (or press and hold on a touch screen) for more actions.</dd>
+      <dt>Select (V)</dt><dd>Click a shape to select it. Drag on empty space to fully enclose shapes or groups to select them; Shift adds to the selection. Drag to move, drag a corner to resize, drag the top circle to rotate. Right-click (or press and hold on a touch screen) for more actions.</dd>
       <dt>Pen (P)</dt><dd>Click to place points. Press and drag a point to bend the line into a curve. Click the first point to close the shape; Enter or double-click finishes, Esc cancels. Click the end of an open line to keep drawing from it.</dd>
       <dt>Pencil (B)</dt><dd>Draw freely. Let go to finish; the line is tidied up automatically.</dd>
       <dt>Line (L)</dt><dd>Drag to draw a straight line. Hold Shift to snap the angle.</dd>
-      <dt>Rectangle (R), Oval (E)</dt><dd>Drag to draw. Hold Shift for a square or circle, Alt for rounded corners on a rectangle.</dd>
+      <dt>Add object</dt><dd>Choose a rectangle (R), rounded rectangle, oval (E), triangle, diamond, pentagon, hexagon, star, heart, arrow or plus, then drag to draw. Hold Shift for equal width and height; Alt rounds rectangle corners. New objects start with the default style. Select the correct layer before selecting or editing its shapes.</dd>
       <dt>Fill (G)</dt><dd>Click inside a shape to fill it with the current colour. Drag across several shapes to fill them all.</dd>
       <dt>Outline (K)</dt><dd>Click a shape's edge to give it the current line style. Drag across several edges to change them all.</dd>
       <dt>Edit points (T)</dt><dd>Drag a point or its round handles. Click a small diamond to add a point; double-click a point to delete it. F makes a point smooth or sharp; G opens or closes the line.</dd>
       <dt>Eraser (C)</dt><dd>Click a shape to remove it, or drag across shapes to remove several.</dd>
       <dt>Pick a colour (I)</dt><dd>Click a shape to copy its colour into the Area or Border colour box.</dd>
-      <dt>Move the view (H)</dt><dd>Drag to move around the artboard. In any tool you can hold Space instead. On a touch screen, pinch to zoom and drag with two fingers.</dd>
+      <dt>Move the view (H)</dt><dd>Drag to move around the artboard. In any tool you can hold Ctrl or Space instead. On a touch screen, pinch to zoom and drag with two fingers.</dd>
     </dl>
     <h3>Keyboard shortcuts</h3>
     <div class="help-cols">
       <dl>
         <dt>Ctrl+K</dt><dd>Search every command</dd>
         <dt>V P B L R E G K T</dt><dd>Select, pen, pencil, line, rectangle, oval, fill, outline, edit points</dd>
-        <dt>C I H</dt><dd>Eraser, colour picker, move the view (or hold Space)</dd>
+        <dt>C I H</dt><dd>Eraser, colour picker, move the view (or hold Ctrl / Space)</dd>
         <dt>â†‘ â†“ in the tool bar</dt><dd>Move between tools</dd>
         <dt>Ctrl+G / Ctrl+Shift+G</dt><dd>Group or ungroup the selected shapes</dd>
         <dt>Ctrl+Z / Ctrl+Shift+Z</dt><dd>Undo and redo (see every step in History)</dd>
@@ -425,6 +435,7 @@
 <script src="merge.js"></script>
 <script src="tools.js"></script>
 <script src="main.js"></script>
+<script src="releases.js"></script>
 <script src="ui.js"></script>
 </body>
 </html>
