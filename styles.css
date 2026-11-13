@@ -500,7 +500,7 @@ body.no-keys .tool kbd { display: none; }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 
-/* empty state: a card over the empty artboard; only its buttons catch clicks */
+/* Empty-state card dismisses on an outside click without blocking that action. */
 .empty-state {
   position: absolute;
   left: 50%;
@@ -510,11 +510,10 @@ body.no-keys .tool kbd { display: none; }
   width: min(360px, calc(100% - 32px));
   padding: 20px 20px 18px;
   text-align: center;
-  pointer-events: none;
+  pointer-events: auto;
   animation: fade-in 0.3s var(--ease);
   transition: opacity 0.2s;
 }
-.empty-state.dimmed { opacity: 0; }
 .empty-state h2 { margin: 0 0 10px; font-size: 17px; color: var(--ink-strong); }
 .empty-state p { margin: 12px 0 10px; color: var(--ink-2); font-size: 13px; line-height: 1.45; }
 .steps { display: flex; justify-content: center; gap: 6px; margin: 0; padding: 0; list-style: none; color: var(--ink); font-weight: 600; }

@@ -1363,6 +1363,44 @@ test("SVG exports every cap and join combination and keeps dotted lines visible"
   }
 });
 
+test("Start your icon dismisses outside the card and stays hidden until a new drawing", () => {
+  const classes = new Set(), inside = {}, outside = {}, listeners = {};
+  const card = {
+    contains(target) { return target === inside; },
+    classList: {
+      contains(name) { return classes.has(name); },
+      toggle(name, on) { if (on) classes.add(name); else classes.delete(name); }
+    }
+  };
+  let hasDrawing = false, modalOpen = false;
+  const app = { state: { emptyStateDismissed: false }, renderHooks: [], panelHooks: [], hasDrawing() { return hasDrawing; } };
+  const sandbox = vm.createContext({ console, Math, JSON, Date, IM: { Model: M, Renderer: R, App: app } });
+  sandbox.window = sandbox;
+  sandbox.document = {
+    querySelector(selector) { return selector === "#empty-state" ? card : selector === "dialog[open]" && modalOpen ? {} : null; },
+    addEventListener(name, handler) { listeners[name] = handler; }
+  };
+  const source = fs.readFileSync(path.join(ROOT, "ui.js"), "utf8").replace(
+    '  wireReleaseNotes();', '  app.testEmpty = { update: updateEmptyState, wire: wireEmptyState }; return;');
+  vm.runInContext(source, sandbox, { filename: "ui.js" });
+  app.testEmpty.wire(); app.testEmpty.update();
+  ok(!classes.has("hidden"));
+  listeners.pointerdown({ target: inside }); app.testEmpty.update();
+  ok(!classes.has("hidden"), "clicks within the card keep starter options available");
+  modalOpen = true; listeners.pointerdown({ target: outside });
+  ok(!app.state.emptyStateDismissed, "welcome and other dialogs do not dismiss the prompt underneath");
+  modalOpen = false; listeners.pointerdown({ target: outside });
+  ok(classes.has("hidden"), "outside press dismisses immediately");
+  app.state.pointerDown = false;
+  for (let i = 0; i < 5; i++) app.testEmpty.update();
+  ok(classes.has("hidden"), "release and subsequent renders never show it again");
+  app.state.emptyStateDismissed = false; app.testEmpty.update();
+  ok(!classes.has("hidden"), "a fresh document can show the prompt again");
+  hasDrawing = true; app.testEmpty.update();
+  hasDrawing = false; app.testEmpty.update();
+  ok(classes.has("hidden"), "undoing a starter shape does not bring the prompt back");
+});
+
 /* ---------- report ---------- */
 
 console.log("\n" + passed + " passed, " + failed + " failed");

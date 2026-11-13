@@ -2,6 +2,16 @@
 var IM = (window.IM = window.IM || {});
 IM.Releases = [
   {
+    "version": "1.2.1",
+    "date": "2026-11-13",
+    "title": "A calmer start",
+    "changes": [
+      "Dismiss Start your icon by clicking outside it; it stays hidden for the current drawing.",
+      "Keep starter options available when clicking inside the card, and show the prompt again for a new icon.",
+      "Bring the custom-domain site up to date with the GitHub Pages release."
+    ]
+  },
+  {
     "version": "1.2.0",
     "date": "2026-11-13",
     "title": "Line ends, corners and our logo",

@@ -70,7 +70,8 @@
       artboardBg: "checker",        // "checker" | "light" | "dark"
       pixelPreview: false,
       hoverId: null,
-      pointerDown: false
+      pointerDown: false,
+      emptyStateDismissed: false
     },
     renderHooks: [],                // called after every render (ui.js)
     panelHooks: [],                 // called after the panels are rebuilt (ui.js)
@@ -1513,6 +1514,7 @@
     app.state.penDraft = null;
     app.state.ghost = null;
     app.state.penPreviewSeg = null;
+    app.state.emptyStateDismissed = false;
     fit();
     markDirty();
     renderAll();

@@ -283,8 +283,17 @@
 
   function updateEmptyState() {
     var e = qs("#empty-state"), empty = !app.hasDrawing();
-    e.classList.toggle("hidden", !empty);
-    e.classList.toggle("dimmed", empty && app.state.pointerDown);
+    if (!empty) app.state.emptyStateDismissed = true;
+    e.classList.toggle("hidden", !empty || app.state.emptyStateDismissed);
+  }
+
+  function wireEmptyState() {
+    document.addEventListener("pointerdown", function (event) {
+      var card = qs("#empty-state");
+      if (card.classList.contains("hidden") || card.contains(event.target) || qs("dialog[open]")) return;
+      app.state.emptyStateDismissed = true;
+      updateEmptyState();
+    }, true);
   }
 
   /* ---------- generic menu (more menu, context menu) ---------- */
@@ -1194,6 +1203,7 @@
     pixG.setAttribute("pointer-events", "none");
     app.canvas.worldG.insertBefore(pixG, app.canvas.overlayG);
     setBg(app.state.artboardBg, true);
+    wireEmptyState();
     wireContextMenu();
     wireHover();
     wireToolNav();
