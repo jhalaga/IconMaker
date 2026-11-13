@@ -2,6 +2,14 @@
 var IM = (window.IM = window.IM || {});
 IM.Releases = [
   {
+    "version": "1.1.1",
+    "date": "2026-11-13",
+    "title": "Release notes polish",
+    "changes": [
+      "Fixed text encoding in release notes and the version button."
+    ]
+  },
+  {
     "version": "1.1.0",
     "date": "2026-11-13",
     "title": "Smoother drawing and selection",
