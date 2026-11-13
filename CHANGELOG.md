@@ -49,6 +49,3 @@ Introducing IconMaker
 - Style icons, undo changes, and export SVG or PNG.
 
 - Choose a theme and accent colour, with automatic local saving.
-
-
-
